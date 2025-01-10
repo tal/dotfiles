@@ -1,0 +1,65 @@
+[alias]
+        co = checkout
+        ci = commit
+        s  = status -sb
+        revert-to = read-tree -u -m HEAD
+        br = branch
+        ff = rebase --stat @{upstream}
+        ls = ls-files
+        lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+        heads = !"git log @{upstream}.. --format='%Cred%h%Creset;%C(yellow)%an%Creset;%H;%Cblue%f%Creset' | git name-rev --stdin --always --name-only | column -t -s';'"
+        wip = !"git add -A; git ls-files --deleted -z | xargs -0 git rm; git commit -m \"wip\""
+        unwip = !"git log -n 1 | grep -q -c wip && git reset HEAD~1"
+        rb = !"git wip;git rebase -i @{upstream};git unwip"
+        pr = !"git fetch;git wip;git ff;git unwip;git heads"
+        pub = "!f() { git push -u ${1:-origin} `git symbolic-ref HEAD`; }; f"
+        mom = !"git fetch && git merge origin/master"
+        fco = "!f() { git fetch && git checkout ${1:-master}; }; f"
+        cob = "!f() { git branch | cut -c 3- | fzf | xargs git checkout; }; f"
+        fcob = "!f() { git fetch && git branch | cut -c 3- | fzf | xargs git checkout; }; f"
+[user]
+	name = Tal Atlas
+	email = me@tal.by
+[github]
+        user = Talby
+        token = 304e58260fb43b283ec77ba7bc996935
+[core]
+        editor = vim
+	excludesfile = /Users/tal/.gitignore
+        autocrlf = input
+	pager = diff-so-fancy | less --tabs=2 -RFX
+[color]
+        ui = true
+[color "branch"]
+        current = yellow reverse
+        local = yellow
+        remote = green
+[color "diff"]
+        meta = yellow bold
+        frag = magenta bold
+        old = red bold
+        new = green bold
+[color "status"]
+        added = yellow
+        changed = green
+        untracked = cyan
+[ghi]
+        token = 7671c3372c10b4e2ffe6deeb343dc1bf2b19ac12
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[init]
+	defaultBranch = master
+[gitbutler]
+	aiModelProvider = anthropic
+[difftool "sourcetree"]
+	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
+	path = 
+[mergetool "sourcetree"]
+	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+	trustExitCode = true
+[diff "lockb"]
+	textconv = bun
+	binary = true
