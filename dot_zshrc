@@ -2,6 +2,10 @@ eval "$(starship init zsh)"
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
+source <(fzf --zsh)
+eval "$(zoxide init zsh)"
+
+
 # bun completions
 [ -s "/Users/tal/.bun/_bun" ] && source "/Users/tal/.bun/_bun"
 
