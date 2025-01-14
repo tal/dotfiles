@@ -20,9 +20,6 @@
 [user]
 	name = Tal Atlas
 	email = me@tal.by
-[github]
-        user = Talby
-        token = 304e58260fb43b283ec77ba7bc996935
 [core]
         editor = vim
 	excludesfile = /Users/tal/.gitignore
@@ -43,8 +40,6 @@
         added = yellow
         changed = green
         untracked = cyan
-[ghi]
-        token = 7671c3372c10b4e2ffe6deeb343dc1bf2b19ac12
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
