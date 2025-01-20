@@ -4,9 +4,10 @@ BaseDefinitions = {
     a = {desc = "Messages", key = "a", appName = "Messages.app", subInvocations = {w = {desc = "WhatsApp", key = "w", appName = "WhatsApp.app"}}},
     c = {desc = "Chat", key = "c", appName = "Slack.app"},
     e = {desc = "Email", key = "e", appName = "Shortwave.app"},
+    f = {desc = "Calendar", key = "f", appName = "Fantastical.app"},
     m = {desc = "Spotify", key = "m", appName = "Spotify.app"},
-    t = {desc = "Tasks", key = "m", appName = "Things3.app"},
     n = {desc = "Notes", key = "n", appName = "Craft.app"},
+    t = {desc = "Tasks", key = "m", appName = "Things3.app"},
     w = {desc = "Arc", key = "w", appName = "Arc.app", subInvocations = {s = {desc = "Safari", key = "s", appName = "Safari.app"}}}
 }
 currentDefinitions = BaseDefinitions
@@ -103,8 +104,66 @@ hs.hotkey.bind(
         hs.spotify.previous()
     end
 )
+function dirExists(path)
+    local attributes = hs.fs.attributes(path)
+    return (attributes and attributes.mode) == "directory"
+end
 function sendSpotifyCommand(cmd)
     local homeDir = "/Users/tal"
+    local scriptDir = homeDir .. "/Projects/spotify-playlist"
+    local function parseBody(body)
+        local bodyJSON = hs.json.decode(body or "")
+        if bodyJSON then
+            print("body " .. hs.json.encode(bodyJSON or "{}"))
+        else
+            print("nil  body")
+        end
+        if bodyJSON and bodyJSON.result then
+            for ____, r in ipairs(bodyJSON.result) do
+                local ____opt_4 = r.value
+                if ____opt_4 ~= nil then
+                    ____opt_4 = ____opt_4.action_type
+                end
+                local ____opt_4_6 = ____opt_4
+                if ____opt_4_6 == nil then
+                    ____opt_4_6 = cmd
+                end
+                local actionType = ____opt_4_6
+                local ____opt_7 = r.value
+                if ____opt_7 ~= nil then
+                    ____opt_7 = ____opt_7.name
+                end
+                local ____opt_7_9 = ____opt_7
+                if ____opt_7_9 == nil then
+                    ____opt_7_9 = r.reason
+                end
+                local reason = ____opt_7_9
+                hs.notify.show(
+                    tostring(actionType) .. " command complete",
+                    actionType,
+                    reason
+                )
+            end
+            return
+        end
+    end
+    if not dirExists(scriptDir) then
+        hs.http.asyncGet(
+            "https://ovgepxasb9.execute-api.us-east-1.amazonaws.com/dev/spotify-playlist-dev?action=" .. cmd,
+            {},
+            function(status, body, headers)
+                if status ~= 200 then
+                    return hs.notify.show(
+                        "Spotify Command Error",
+                        "Status not 200, " .. tostring(status),
+                        body
+                    )
+                end
+                parseBody(body)
+            end
+        )
+        return
+    end
     local command = "/opt/homebrew/bin/node"
     local args = {"./dist/cli.js", cmd}
     print("spotify command: " .. cmd)
@@ -116,34 +175,8 @@ function sendSpotifyCommand(cmd)
             local idxEnd = (string.find(stdOut, "' }\nDone", nil, true) or 0) - 1
             local result = hs.json.decode(stdOut)
             local body = hs.json.decode(result and result.body or "")
-            if body then
-                print("body " .. hs.json.encode(body or "{}"))
-            else
-                print("nil  body")
-            end
             if body and body.result then
-                for ____, r in ipairs(body.result) do
-                    local ____opt_4 = r.value
-                    if ____opt_4 ~= nil then
-                        ____opt_4 = ____opt_4.action_type
-                    end
-                    local ____opt_4_6 = ____opt_4
-                    if ____opt_4_6 == nil then
-                        ____opt_4_6 = cmd
-                    end
-                    local actionType = ____opt_4_6
-                    local ____r_value_name_7 = r.value.name
-                    if ____r_value_name_7 == nil then
-                        ____r_value_name_7 = r.reason
-                    end
-                    local reason = ____r_value_name_7
-                    hs.notify.show(
-                        tostring(actionType) .. " command complete",
-                        actionType,
-                        reason
-                    )
-                end
-                return
+                parseBody(result and result.body)
             elseif idxStart >= 0 and idxEnd >= 0 then
                 local jsonText = __TS__StringSubstring(stdOut, idxStart + #startStr, idxEnd)
                 local result = hs.json.decode(jsonText)
@@ -172,7 +205,10 @@ hs.hotkey.bind(
     nil,
     function()
         hs.alert.show("▲")
-        sendSpotifyCommand("promote"):start()
+        local ____opt_16 = sendSpotifyCommand("promote")
+        if ____opt_16 ~= nil then
+            ____opt_16:start()
+        end
     end
 )
 hs.hotkey.bind(
@@ -181,7 +217,10 @@ hs.hotkey.bind(
     nil,
     function()
         hs.alert.show("▲⥽")
-        sendSpotifyCommand("promotes"):start()
+        local ____opt_18 = sendSpotifyCommand("promotes")
+        if ____opt_18 ~= nil then
+            ____opt_18:start()
+        end
     end
 )
 hs.hotkey.bind(
@@ -190,6 +229,9 @@ hs.hotkey.bind(
     nil,
     function()
         hs.alert.show("▼")
-        sendSpotifyCommand("demotes"):start()
+        local ____opt_20 = sendSpotifyCommand("demotes")
+        if ____opt_20 ~= nil then
+            ____opt_20:start()
+        end
     end
 )
