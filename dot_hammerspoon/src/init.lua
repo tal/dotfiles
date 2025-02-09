@@ -1,14 +1,14 @@
 local ____lualib = require("lualib_bundle")
 local __TS__StringSubstring = ____lualib.__TS__StringSubstring
 BaseDefinitions = {
-    a = {desc = "Messages", key = "a", appName = "Messages.app", subInvocations = {w = {desc = "WhatsApp", key = "w", appName = "WhatsApp.app"}}},
+    a = {desc = "Messages", key = "a", appName = "Messages.app", subInvocations = {w = {desc = "WhatsApp", key = "w", appName = "WhatsApp.app"}, a = {desc = "Messages", key = "a", appName = "Messages.app"}}},
     c = {desc = "Chat", key = "c", appName = "Slack.app"},
     e = {desc = "Email", key = "e", appName = "Shortwave.app"},
-    f = {desc = "Calendar", key = "f", appName = "Fantastical.app"},
+    f = {desc = "Calendar", key = "f", appName = "Fantastical.app", subInvocations = {g = {desc = "Google Calendar", key = "g", appName = "Google Calendar.app"}, f = {desc = "Fantastical", key = "f", appName = "Fantastical.app"}}},
     m = {desc = "Spotify", key = "m", appName = "Spotify.app"},
     n = {desc = "Notes", key = "n", appName = "Craft.app"},
     t = {desc = "Tasks", key = "m", appName = "Things3.app"},
-    w = {desc = "Arc", key = "w", appName = "Arc.app", subInvocations = {s = {desc = "Safari", key = "s", appName = "Safari.app"}}}
+    w = {desc = "Web", key = "w", subInvocations = {w = {desc = "Arc", key = "w", appName = "Arc.app"}, s = {desc = "Safari", key = "s", appName = "Safari.app"}}}
 }
 currentDefinitions = BaseDefinitions
 invocationTap = hs.eventtap.new(
@@ -24,7 +24,12 @@ invocationTap = hs.eventtap.new(
             if definition ~= nil then
                 hs.alert.closeAll()
                 hs.alert.show((key .. " - ") .. definition.desc, 0.5)
+                if definition.subInvocations then
+                    currentDefinitions = definition.subInvocations
+                    return true
+                end
                 if definition.appName then
+                    print("launching " .. definition.appName)
                     hs.application.launchOrFocus(definition.appName)
                 end
             end
@@ -191,7 +196,7 @@ function sendSpotifyCommand(cmd)
                 hs.notify.show("Spotify Command Error", cmd, stdErr)
                 print(stdErr)
             else
-                hs.notify.show("Spotify Command", "unparseable", stdOut)
+                hs.notify.show("Spotify Command", "unparsable", stdOut)
             end
         end,
         args

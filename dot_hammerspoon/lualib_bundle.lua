@@ -193,8 +193,14 @@ do
                 result[#result + 1] = v
             end
         else
-            for i, v in arrayLikeIterator(arrayLike) do
-                result[#result + 1] = mapFn(thisArg, v, i - 1)
+            local i = 0
+            for ____, v in arrayLikeIterator(arrayLike) do
+                local ____mapFn_3 = mapFn
+                local ____thisArg_1 = thisArg
+                local ____v_2 = v
+                local ____i_0 = i
+                i = ____i_0 + 1
+                result[#result + 1] = ____mapFn_3(____thisArg_1, ____v_2, ____i_0)
             end
         end
         return result
@@ -1088,6 +1094,11 @@ do
         end
         if __TS__StringIncludes(_VERSION, "Lua 5.0") then
             return debug.traceback(("[Level " .. tostring(level)) .. "]")
+        elseif _VERSION == "Lua 5.1" then
+            return string.sub(
+                debug.traceback("", level),
+                2
+            )
         else
             return debug.traceback(nil, level)
         end
@@ -1096,7 +1107,7 @@ do
         return function(self)
             local description = getDescription(self)
             local caller = debug.getinfo(3, "f")
-            local isClassicLua = __TS__StringIncludes(_VERSION, "Lua 5.0") or _VERSION == "Lua 5.1"
+            local isClassicLua = __TS__StringIncludes(_VERSION, "Lua 5.0")
             if isClassicLua or caller and caller.func ~= error then
                 return description
             else
@@ -1120,7 +1131,7 @@ do
         end
         self.message = message
         self.name = "Error"
-        self.stack = getErrorStack(nil, self.constructor.new)
+        self.stack = getErrorStack(nil, __TS__New)
         local metatable = getmetatable(self)
         if metatable and not metatable.__errorToStringPatched then
             metatable.__errorToStringPatched = true
@@ -1440,13 +1451,29 @@ local __TS__MathAtan2 = math.atan2 or math.atan
 
 local __TS__MathModf = math.modf
 
+local function __TS__NumberIsNaN(value)
+    return value ~= value
+end
+
 local function __TS__MathSign(val)
-    if val > 0 then
-        return 1
-    elseif val < 0 then
+    if __TS__NumberIsNaN(val) or val == 0 then
+        return val
+    end
+    if val < 0 then
         return -1
     end
-    return 0
+    return 1
+end
+
+local function __TS__NumberIsFinite(value)
+    return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
+local function __TS__MathTrunc(val)
+    if not __TS__NumberIsFinite(val) or val == 0 then
+        return val
+    end
+    return val > 0 and math.floor(val) or math.ceil(val)
 end
 
 local function __TS__Number(value)
@@ -1476,16 +1503,8 @@ local function __TS__Number(value)
     end
 end
 
-local function __TS__NumberIsFinite(value)
-    return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
-end
-
 local function __TS__NumberIsInteger(value)
     return __TS__NumberIsFinite(value) and math.floor(value) == value
-end
-
-local function __TS__NumberIsNaN(value)
-    return value ~= value
 end
 
 local function __TS__StringSubstring(self, start, ____end)
@@ -1620,23 +1639,17 @@ local function __TS__ObjectDefineProperty(target, key, desc)
         local valueExists = value ~= nil
         local ____desc_set_4 = desc.set
         local ____desc_get_5 = desc.get
-        local ____temp_0
-        if desc.configurable ~= nil then
-            ____temp_0 = desc.configurable
-        else
-            ____temp_0 = valueExists
+        local ____desc_configurable_0 = desc.configurable
+        if ____desc_configurable_0 == nil then
+            ____desc_configurable_0 = valueExists
         end
-        local ____temp_1
-        if desc.enumerable ~= nil then
-            ____temp_1 = desc.enumerable
-        else
-            ____temp_1 = valueExists
+        local ____desc_enumerable_1 = desc.enumerable
+        if ____desc_enumerable_1 == nil then
+            ____desc_enumerable_1 = valueExists
         end
-        local ____temp_2
-        if desc.writable ~= nil then
-            ____temp_2 = desc.writable
-        else
-            ____temp_2 = valueExists
+        local ____desc_writable_2 = desc.writable
+        if ____desc_writable_2 == nil then
+            ____desc_writable_2 = valueExists
         end
         local ____temp_3
         if desc.value ~= nil then
@@ -1647,9 +1660,9 @@ local function __TS__ObjectDefineProperty(target, key, desc)
         descriptor = {
             set = ____desc_set_4,
             get = ____desc_get_5,
-            configurable = ____temp_0,
-            enumerable = ____temp_1,
-            writable = ____temp_2,
+            configurable = ____desc_configurable_0,
+            enumerable = ____desc_enumerable_1,
+            writable = ____desc_writable_2,
             value = ____temp_3
         }
     end
@@ -2026,6 +2039,64 @@ do
                 return result
             end
         }
+    end
+    function Set.prototype.union(self, other)
+        local result = __TS__New(Set, self)
+        for ____, item in __TS__Iterator(other) do
+            result:add(item)
+        end
+        return result
+    end
+    function Set.prototype.intersection(self, other)
+        local result = __TS__New(Set)
+        for ____, item in __TS__Iterator(self) do
+            if other:has(item) then
+                result:add(item)
+            end
+        end
+        return result
+    end
+    function Set.prototype.difference(self, other)
+        local result = __TS__New(Set, self)
+        for ____, item in __TS__Iterator(other) do
+            result:delete(item)
+        end
+        return result
+    end
+    function Set.prototype.symmetricDifference(self, other)
+        local result = __TS__New(Set, self)
+        for ____, item in __TS__Iterator(other) do
+            if self:has(item) then
+                result:delete(item)
+            else
+                result:add(item)
+            end
+        end
+        return result
+    end
+    function Set.prototype.isSubsetOf(self, other)
+        for ____, item in __TS__Iterator(self) do
+            if not other:has(item) then
+                return false
+            end
+        end
+        return true
+    end
+    function Set.prototype.isSupersetOf(self, other)
+        for ____, item in __TS__Iterator(other) do
+            if not self:has(item) then
+                return false
+            end
+        end
+        return true
+    end
+    function Set.prototype.isDisjointFrom(self, other)
+        for ____, item in __TS__Iterator(self) do
+            if other:has(item) then
+                return false
+            end
+        end
+        return true
     end
     Set[Symbol.species] = Set
 end
@@ -2476,10 +2547,7 @@ local function __TS__Using(self, cb, ...)
     local args = {...}
     local thrownError
     local ok, result = xpcall(
-        function() return cb(
-            nil,
-            __TS__Unpack(args)
-        ) end,
+        function() return cb(__TS__Unpack(args)) end,
         function(err)
             thrownError = err
             return thrownError
@@ -2601,6 +2669,7 @@ return {
   __TS__MathAtan2 = __TS__MathAtan2,
   __TS__MathModf = __TS__MathModf,
   __TS__MathSign = __TS__MathSign,
+  __TS__MathTrunc = __TS__MathTrunc,
   __TS__New = __TS__New,
   __TS__Number = __TS__Number,
   __TS__NumberIsFinite = __TS__NumberIsFinite,
