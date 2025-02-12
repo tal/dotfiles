@@ -2,6 +2,7 @@ eval "$(/opt/homebrew/bin/brew shellenv)"
 
 eval "$(starship init zsh)"
 
+
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 source <(fzf --zsh)
@@ -14,9 +15,11 @@ eval "$(zoxide init zsh)"
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
-# Load homebrew shell variables
 
-PATH=~/.console-ninja/.bin:$PATH
+# PATH=~/.console-ninja/.bin:$PATH
 
 # datadog
 [ -s "~/.zshrc.dd" ] &&  source ~/.zshrc.dd
+
+autoload -Uz compinit
+compinit
