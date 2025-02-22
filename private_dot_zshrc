@@ -21,5 +21,24 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # datadog
 [ -s "~/.zshrc.dd" ] &&  source ~/.zshrc.dd
 
+# Load completion system
 autoload -Uz compinit
 compinit
+
+# Cache completion to speed things up
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ~/.zsh/cache
+
+# Fuzzy matching of completions
+zstyle ':completion:*' completer _complete _match _approximate
+zstyle ':completion:*:match:*' original only
+zstyle ':completion:*:approximate:*' max-errors 1 numeric
+
+# Case-insensitive completion
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# Show completion menu when number of options is at least 2
+zstyle ':completion:*' menu select=2
+
+# Group completions by type
+zstyle ':completion:*' group-name ''
