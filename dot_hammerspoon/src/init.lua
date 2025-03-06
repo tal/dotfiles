@@ -1,5 +1,7 @@
 local ____lualib = require("lualib_bundle")
 local __TS__StringSubstring = ____lualib.__TS__StringSubstring
+local __TS__StringEndsWith = ____lualib.__TS__StringEndsWith
+local __TS__ArraySome = ____lualib.__TS__ArraySome
 BaseDefinitions = {
     a = {desc = "Messages", key = "a", appName = "Messages.app", subInvocations = {w = {desc = "WhatsApp", key = "w", appName = "WhatsApp.app"}, a = {desc = "Messages", key = "a", appName = "Messages.app"}}},
     c = {desc = "Chat", key = "c", appName = "Slack.app"},
@@ -240,3 +242,37 @@ hs.hotkey.bind(
         end
     end
 )
+--- Sets up a file watcher that automatically reloads Hammerspoon config
+-- when any Lua file in the Hammerspoon config directory changes
+function setupConfigFileWatcher()
+    local configDir = os.getenv("HOME") .. "/.hammerspoon/"
+    print("Setting up config file watcher for " .. configDir)
+    local watcher = hs.pathwatcher.new(
+        configDir,
+        function(changedFiles, flagTables)
+            local shouldReload = __TS__ArraySome(
+                changedFiles,
+                function(____, file)
+                    local isLuaFile = __TS__StringEndsWith(file, ".lua")
+                    if isLuaFile then
+                        print("Lua config file changed: " .. file)
+                        return true
+                    end
+                    return false
+                end
+            )
+            if shouldReload then
+                print("Reloading Hammerspoon configuration...")
+                hs.notify.show("Hammerspoon", "Configuration reloaded", "Config file change detected")
+                hs.reload()
+            end
+        end
+    )
+    if watcher then
+        watcher:start()
+        print("Config file watcher started")
+    else
+        print("Error: Could not create config file watcher")
+    end
+end
+setupConfigFileWatcher()
