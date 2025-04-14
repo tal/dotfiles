@@ -27,7 +27,7 @@ function showKeysCanvas(definitions)
             if frameSize and frameSize.w and frameSize.h then
                 screenWidth = frameSize.w
                 screenHeight = frameSize.h
-                print((("Got screen dimensions from focused window: " .. tostring(screenWidth)) .. "x") .. tostring(screenHeight))
+                print((("Got screen dimensions from focused window : " .. tostring(screenWidth)) .. "x") .. tostring(screenHeight))
             else
                 do
                     local function ____catch(innerError)
@@ -37,7 +37,7 @@ function showKeysCanvas(definitions)
                         local allScreens = hs.screen.allScreens()
                         if allScreens and #allScreens > 0 then
                             local firstScreen = allScreens[1]
-                            if firstScreen then
+                            if firstScreen ~= nil then
                                 local frame = firstScreen.frame()
                                 if frame and frame.w and frame.h then
                                     screenWidth = frame.w
@@ -270,7 +270,7 @@ BaseDefinitions = {
     m = {desc = "Spotify", key = "m", appName = "Spotify.app"},
     n = {desc = "Notes", key = "n", appName = "Craft.app"},
     t = {desc = "Tasks", key = "m", appName = "Things3.app"},
-    w = {desc = "Web", key = "w", subInvocations = {w = {desc = "Arc", key = "w", appName = "Arc.app"}, s = {desc = "Safari", key = "s", appName = "Safari.app"}}}
+    w = {desc = "Web", key = "w", subInvocations = {w = {desc = "Arc", key = "w", appName = "Arc.app"}, s = {desc = "Safari", key = "s", appName = "Safari.app"}, c = {desc = "Chrome", key = "c", appName = "Google Chrome.app"}}}
 }
 currentDefinitions = BaseDefinitions
 invocationTap = hs.eventtap.new(
@@ -355,6 +355,30 @@ hs.hotkey.bind(
     nil,
     function()
         hs.application.launchOrFocus("Warp.app")
+    end
+)
+hs.hotkey.bind(
+    {"⌃"},
+    "1",
+    nil,
+    function()
+        hs.application.launchOrFocus("Visual Studio Code.app")
+    end
+)
+hs.hotkey.bind(
+    {"⌃"},
+    "2",
+    nil,
+    function()
+        hs.application.launchOrFocus("Arc.app")
+    end
+)
+hs.hotkey.bind(
+    {"⌃"},
+    "3",
+    nil,
+    function()
+        hs.application.launchOrFocus("Xcode.app")
     end
 )
 function spotifySkipPosition(seconds)
@@ -550,7 +574,8 @@ function setupConfigFileWatcher()
             )
             if shouldReload then
                 print("Reloading Hammerspoon configuration...")
-                hs.notify.show("Hammerspoon", "Configuration reloaded", "Config file change detected")
+                local notification = hs.notify.show("Hammerspoon", "Configuration reloaded", "Config file change detected")
+                notification:withdrawAfter(2)
                 hs.reload()
             end
         end
