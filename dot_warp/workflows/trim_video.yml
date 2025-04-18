@@ -1,0 +1,12 @@
+name: Example workflow
+command: tea ffmpeg -i {{input_file}} -ss 00:{{start_time}} -t 00:{{end_time}} -c copy {{output_file}}
+arguments:
+  - name: input_file
+    description: Input video
+  - name: output_file
+    description: Input video
+  - name: start_time
+    description: in the format `00:00`
+    default_value: 00:00
+  - name: end_time
+    description: in the format `00:00`
