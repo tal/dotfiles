@@ -4,23 +4,7 @@
             "complex_modifications": {
                 "rules": [
                     {
-                        "description": "Ctrl+1 to launch or focus VS Code",
-                        "manipulators": [
-                            {
-                                "from": {
-                                    "key_code": "1",
-                                    "modifiers": {
-                                        "mandatory": ["control"],
-                                        "optional": ["any"]
-                                    }
-                                },
-                                "to": [{ "shell_command": "open -a 'Visual Studio Code'" }],
-                                "type": "basic"
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Remap Cmd+T to Cmd+Shift+O in Xcode",
+                        "description": "Remap Cmd+P to Cmd+Shift+O in Xcode",
                         "manipulators": [
                             {
                                 "conditions": [
@@ -32,7 +16,7 @@
                                     }
                                 ],
                                 "from": {
-                                    "key_code": "t",
+                                    "key_code": "p",
                                     "modifiers": { "mandatory": ["left_command"] }
                                 },
                                 "to": [
