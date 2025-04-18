@@ -42,3 +42,4 @@ zstyle ':completion:*' menu select=2
 
 # Group completions by type
 zstyle ':completion:*' group-name ''
+alias claude="/Users/tal/.claude/local/claude"
