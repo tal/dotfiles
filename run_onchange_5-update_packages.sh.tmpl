@@ -1,0 +1,21 @@
+#!/bin/bash
+# {{ include "Brewfile" | sha256sum }}
+
+HOMEBREW_BUNDLE_FILE="{{ .chezmoi.sourceDir }}/Brewfile"
+echo "Brewfile changed, updating packages from $HOMEBREW_BUNDLE_FILE..."
+# Check if the Brewfile exists
+if [ ! -f "$HOMEBREW_BUNDLE_FILE" ]; then
+  echo "Brewfile not found at $HOMEBREW_BUNDLE_FILE"
+  exit 1
+fi
+# Check if Homebrew is installed
+if ! command -v brew &> /dev/null; then
+  echo "Homebrew is not installed. Please install it first."
+  exit 1
+fi
+# Check if the brew bundle command is available
+if ! brew bundle &> /dev/null; then
+  echo "brew bundle command is not available. Please install Homebrew Bundle first."
+  exit 1
+fi
+brew bundle install

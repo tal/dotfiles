@@ -12,14 +12,14 @@ fi
 brew update
 
 # Install all dependencies from Brewfile
-BREWFILE_PATH="{{ .chezmoi.sourceDir }}/Brewfile"
-if [ ! -f "$BREWFILE_PATH" ]; then
-    echo "Brewfile not found at $BREWFILE_PATH. Skipping installation of dependencies."
+HOMEBREW_BUNDLE_FILE="{{ .chezmoi.sourceDir }}/Brewfile"
+if [ ! -f "$HOMEBREW_BUNDLE_FILE" ]; then
+    echo "Brewfile not found at $HOMEBREW_BUNDLE_FILE. Skipping installation of dependencies."
     exit 1
 fi
 # Install dependencies from Brewfile
-echo "Installing dependencies from Brewfile at $BREWFILE_PATH..."
-brew bundle --file="$BREWFILE_PATH" --no-lock --no-upgrade
+echo "Installing dependencies from Brewfile at $HOMEBREW_BUNDLE_FILE..."
+brew bundle install
 if [ $? -ne 0 ]; then
     echo "Failed to install dependencies from Brewfile."
     exit 1

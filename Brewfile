@@ -6,7 +6,6 @@ tap "mas-cli/tap"
 brew "awscli"
 brew "bat"
 brew "node"
-brew "bitwarden-cli"
 brew "glib"
 brew "chezmoi"
 brew "diff-so-fancy"
@@ -37,6 +36,7 @@ brew "mosh"
 brew "prettier"
 brew "vapoursynth"
 brew "yt-dlp"
+brew "jordanbaird-ice"
 brew "mpv"
 brew "netcat"
 brew "nnn"
@@ -109,7 +109,6 @@ cask "vlc"
 cask "warp"
 cask "whatsapp"
 cask "xcodes"
-cask "xmind"
 cask "zed"
 cask "zoom"
 mas "1Password for Safari", id: 1569813296
@@ -136,6 +135,7 @@ mas "SourceryPro", id: 1561780836
 mas "Tailscale", id: 1475387142
 mas "TestFlight", id: 899247664
 mas "Things", id: 904280696
+mas "Velja", id: 1607635845
 mas "Xcode", id: 497799835
 mas "Yoink", id: 457622435
 # vscode "arcanis.vscode-zipfs"

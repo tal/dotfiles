@@ -1,5 +1,0 @@
-#!/bin/bash
-# {{ include "Brewfile" | sha256sum }}
-
-echo "Brewfile changed, updating packages..."
-brew bundle --file="{{ .chezmoi.sourceDir }}/Brewfile"
