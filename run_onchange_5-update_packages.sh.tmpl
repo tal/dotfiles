@@ -13,9 +13,4 @@ if ! command -v brew &> /dev/null; then
   echo "Homebrew is not installed. Please install it first."
   exit 1
 fi
-# Check if the brew bundle command is available
-if ! brew bundle &> /dev/null; then
-  echo "brew bundle command is not available. Please install Homebrew Bundle first."
-  exit 1
-fi
-brew bundle install
+brew bundle install --file="$HOMEBREW_BUNDLE_FILE"
