@@ -4,5 +4,8 @@ dictionaryDefinitions: []
 dictionaries: []
 words:
 - chezmoi
+- velja
+- hammerspoon
+- osascript
 ignoreWords: []
 import: []
