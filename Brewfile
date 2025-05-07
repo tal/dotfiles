@@ -108,7 +108,6 @@ cask "vlc"
 cask "warp"
 cask "whatsapp"
 cask "xcodes"
-cask "zoom"
 mas "1Password for Safari", id: 1569813296
 mas "A Companion for SwiftUI", id: 1485436674
 mas "Bakery", id: 1575220747
