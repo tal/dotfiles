@@ -21,4 +21,4 @@ if ! command -v brew &> /dev/null; then
   echo "Homebrew is not installed. Please install it first."
   exit 1
 fi
-brew bundle install --file="$HOMEBREW_BUNDLE_FILE"
+brew bundle install --file="$HOMEBREW_BUNDLE_FILE" --no-upgrade --quiet

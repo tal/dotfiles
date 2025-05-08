@@ -1,7 +1,5 @@
 # spell-checker:disable
 tap "1password/tap"
-tap "homebrew/bundle"
-tap "homebrew/cask-fonts"
 tap "mas-cli/tap"
 brew "awscli"
 brew "bat"

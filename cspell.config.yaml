@@ -7,5 +7,6 @@ words:
 - velja
 - hammerspoon
 - osascript
-ignoreWords: []
+ignoreWords:
+- symbolichotkeys
 import: []
