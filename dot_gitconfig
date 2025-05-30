@@ -75,7 +75,7 @@
     autosetuprebase = always  # Default to rebase for new branches
 
 [commit]
-    verbose = true            # Show diff in commit message editor
+    verbose = true
 
 [delta]
         navigate = true
@@ -85,7 +85,6 @@
 
 [interactive]
         diffFilter = delta --color-only
-
 [color]
         ui = true
 [color "branch"]
