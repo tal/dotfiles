@@ -348,7 +348,6 @@ ctrlZHotkey = hs.hotkey.new(
 )
 currentDefinitions = BaseDefinitions
 invocationTap:stop()
-ctrlZHotkey:enable()
 hs.hotkey.bind(
     {"⌃"},
     "`",
