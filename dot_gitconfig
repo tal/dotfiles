@@ -1,31 +1,91 @@
 [alias]
+        # Basic shortcuts
         co = checkout
         ci = commit
         s  = status -sb
-        revert-to = read-tree -u -m HEAD
         br = branch
-        ff = rebase --stat @{upstream}
         ls = ls-files
-        lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
-        heads = !"git log @{upstream}.. --format='%Cred%h%Creset;%C(yellow)%an%Creset;%H;%Cblue%f%Creset' | git name-rev --stdin --always --name-only | column -t -s';'"
+
+        # Modern Git commands
+        sw = switch
+        rs = restore
+
+        # Enhanced branch management
+        recent = branch --sort=-committerdate
+        main = !git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'
+        cleanup = !git branch --merged | grep -v '\\*\\|main\\|master' | xargs -n 1 git branch -d
+
+        # Your excellent workflow aliases (updated for main)
+        revert-to = read-tree -u -m HEAD
+        ff = rebase --stat @{upstream}
         wip = !"git add -A; git ls-files --deleted -z | xargs -0 git rm; git commit -m \"wip\""
         unwip = !"git log -n 1 | grep -q -c wip && git reset HEAD~1"
         rb = !"git wip;git rebase -i @{upstream};git unwip"
         pr = !"git fetch;git wip;git ff;git unwip;git heads"
+
+        # Publishing and fetching (updated for main)
         pub = "!f() { git push -u ${1:-origin} `git symbolic-ref HEAD`; }; f"
-        mom = !"git fetch && git merge origin/master"
-        fco = "!f() { git fetch && git checkout ${1:-master}; }; f"
+        mom = !"git fetch && git merge origin/main"
+        fco = "!f() { git fetch && git checkout ${1:-main}; }; f"
+
+        # Interactive branch selection with fzf
         cob = "!f() { git branch | cut -c 3- | fzf | xargs git checkout; }; f"
         fcob = "!f() { git fetch && git branch | cut -c 3- | fzf | xargs git checkout; }; f"
+
+        # Logging and visualization
+        lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+        heads = !"git log @{upstream}.. --format='%Cred%h%Creset;%C(yellow)%an%Creset;%H;%Cblue%f%Creset' | git name-rev --annotate-stdin --always --name-only | column -t -s';'"
+
+        # Additional useful aliases
+        last = log -1 HEAD --stat
+        unstage = reset HEAD --
+        discard = checkout --
+        amend = commit --amend --no-edit
+
+        # Safe force push
+        pushf = push --force-with-lease
+
+        # Better log variants
+        tree = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --all
+        oneline = log --oneline --decorate --graph
+
+        # Stash improvements
+        pop = stash pop
+
+        # Find stuff
+        find-merge = "!sh -c 'commit=$0 && branch=${1:-HEAD} && (git rev-list $commit..$branch --ancestry-path | cat -n; git rev-list $commit..$branch --first-parent | cat -n) | sort -k2 -s | uniq -f1 -d | sort -n | tail -1 | cut -f2'"
+
 [user]
-	name = Tal Atlas
-	email = me@tal.by
+        name = Tal Atlas
+        email = me@tal.by
+
 [core]
         editor = vim
-	excludesfile = /Users/tal/.gitignore
+        excludesfile = ~/.gitignore
         autocrlf = input
-	pager = diff-so-fancy | less --tabs=2 -RFX
-	hooksPath = /usr/local/dd/global_hooks
+        # Consider updating to delta for better diffs
+        pager = delta
+        hooksPath = /usr/local/dd/global_hooks
+[fetch]
+    prune = true              # Auto-remove deleted remote branches
+    prunetags = true          # Also prune deleted tags
+
+[branch]
+    autosetupmerge = always   # Auto-setup merge tracking
+    autosetuprebase = always  # Default to rebase for new branches
+
+[commit]
+    verbose = true            # Show diff in commit message editor
+
+[delta]
+        navigate = true
+        light = false
+        side-by-side = true
+        line-numbers = true
+
+[interactive]
+        diffFilter = delta --color-only
+
 [color]
         ui = true
 [color "branch"]
@@ -41,21 +101,40 @@
         added = yellow
         changed = green
         untracked = cyan
-[filter "lfs"]
-	clean = git-lfs clean -- %f
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-	required = true
+
 [init]
-	defaultBranch = master
+        defaultBranch = main
+
+[pull]
+        rebase = true
+
+[push]
+        default = simple
+        autoSetupRemote = true
+
+[rebase]
+        autoStash = true
+
+[rerere]
+        enabled = true
+
+[merge]
+        conflictstyle = diff3
+
+[diff]
+        colorMoved = default
+
+[filter "lfs"]
+        clean = git-lfs clean -- %f
+        smudge = git-lfs smudge -- %f
+        process = git-lfs filter-process
+        required = true
+
 [gitbutler]
-	aiModelProvider = anthropic
-[difftool "sourcetree"]
-	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
-	path = 
-[mergetool "sourcetree"]
-	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
-	trustExitCode = true
+        aiModelProvider = anthropic
+
+
+
 [diff "lockb"]
-	textconv = bun
-	binary = true
+        textconv = bun
+        binary = true
