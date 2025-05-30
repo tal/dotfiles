@@ -1,0 +1,94 @@
+{
+  "actions" : [
+    {
+      "actions" : [
+        {
+          "key" : "w",
+          "type" : "application",
+          "value" : "/Applications/Arc.app"
+        },
+        {
+          "key" : "s",
+          "type" : "application",
+          "value" : "/System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app"
+        },
+        {
+          "key" : "m",
+          "label" : "maps",
+          "type" : "url",
+          "value" : "https://maps.google.com"
+        }
+      ],
+      "key" : "w",
+      "label" : "Web",
+      "type" : "group"
+    },
+    {
+      "actions" : [
+        {
+          "key" : "a",
+          "type" : "application",
+          "value" : "/System/Applications/Messages.app"
+        },
+        {
+          "key" : "w",
+          "type" : "application",
+          "value" : "/Applications/WhatsApp.app"
+        },
+        {
+          "key" : "s",
+          "type" : "application",
+          "value" : "/Applications/Signal Beta.app"
+        }
+      ],
+      "key" : "a",
+      "label" : "Messages",
+      "type" : "group"
+    },
+    {
+      "key" : "m",
+      "type" : "application",
+      "value" : "/Applications/Spotify.app"
+    },
+    {
+      "actions" : [
+        {
+          "key" : "e",
+          "type" : "application",
+          "value" : "/Applications/Shortwave.app"
+        }
+      ],
+      "key" : "e",
+      "label" : "Email",
+      "type" : "group"
+    },
+    {
+      "key" : "n",
+      "type" : "application",
+      "value" : "/Applications/Craft.app"
+    },
+    {
+      "actions" : [
+        {
+          "key" : "f",
+          "type" : "application",
+          "value" : "/Applications/Fantastical.app"
+        },
+        {
+          "key" : "g",
+          "type" : "application",
+          "value" : ""
+        }
+      ],
+      "key" : "f",
+      "label" : "Calendar",
+      "type" : "group"
+    },
+    {
+      "key" : "c",
+      "type" : "application",
+      "value" : "/Applications/Slack.app"
+    }
+  ],
+  "type" : "group"
+}
