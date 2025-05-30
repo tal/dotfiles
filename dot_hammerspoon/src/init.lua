@@ -348,38 +348,6 @@ ctrlZHotkey = hs.hotkey.new(
 )
 currentDefinitions = BaseDefinitions
 invocationTap:stop()
-hs.hotkey.bind(
-    {"⌃"},
-    "`",
-    nil,
-    function()
-        hs.application.launchOrFocus("Warp.app")
-    end
-)
-hs.hotkey.bind(
-    {"⌃"},
-    "1",
-    nil,
-    function()
-        hs.application.launchOrFocus("Visual Studio Code.app")
-    end
-)
-hs.hotkey.bind(
-    {"⌃"},
-    "2",
-    nil,
-    function()
-        hs.application.launchOrFocus("Arc.app")
-    end
-)
-hs.hotkey.bind(
-    {"⌃"},
-    "3",
-    nil,
-    function()
-        hs.application.launchOrFocus("Xcode.app")
-    end
-)
 function spotifySkipPosition(seconds)
     local pos = hs.spotify.getPosition()
     local newPos = tonumber(pos + seconds)
