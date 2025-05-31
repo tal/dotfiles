@@ -106,33 +106,33 @@ cask "vlc"
 cask "warp"
 cask "whatsapp"
 cask "xcodes"
-mas "1Password for Safari", id: 1569813296
-mas "A Companion for SwiftUI", id: 1485436674
-mas "Bakery", id: 1575220747
-mas "Cleft", id: 6479458038
-mas "Craft", id: 1487937127
-mas "Developer", id: 640199958
-mas "Diffusers", id: 1666309574
-mas "DoMarks", id: 1518886084
-mas "Drafts", id: 1435957248
-mas "Due", id: 524373870
-mas "Flame", id: 325206381
-mas "Flighty", id: 1358823008
-mas "GIFwrapped", id: 782319880
-mas "Hyperduck", id: 6444667067
-mas "In Your Face", id: 1476964367
-mas "Just Press Record", id: 1033342465
-mas "MakePass", id: 1450989464
-mas "OpenIn", id: 1643649331
-mas "Paprika Recipe Manager 3", id: 1303222628
-mas "Soulver 3", id: 1508732804
-mas "SourceryPro", id: 1561780836
-mas "Tailscale", id: 1475387142
-mas "TestFlight", id: 899247664
-mas "Things", id: 904280696
-mas "Velja", id: 1607635845
-mas "Xcode", id: 497799835
-mas "Yoink", id: 457622435
+# mas "1Password for Safari", id: 1569813296
+# mas "A Companion for SwiftUI", id: 1485436674
+# mas "Bakery", id: 1575220747
+# mas "Cleft", id: 6479458038
+# mas "Craft", id: 1487937127
+# mas "Developer", id: 640199958
+# mas "Diffusers", id: 1666309574
+# mas "DoMarks", id: 1518886084
+# mas "Drafts", id: 1435957248
+# mas "Due", id: 524373870
+# mas "Flame", id: 325206381
+# mas "Flighty", id: 1358823008
+# mas "GIFwrapped", id: 782319880
+# mas "Hyperduck", id: 6444667067
+# mas "In Your Face", id: 1476964367
+# mas "Just Press Record", id: 1033342465
+# mas "MakePass", id: 1450989464
+# mas "OpenIn", id: 1643649331
+# mas "Paprika Recipe Manager 3", id: 1303222628
+# mas "Soulver 3", id: 1508732804
+# mas "SourceryPro", id: 1561780836
+# mas "Tailscale", id: 1475387142
+# mas "TestFlight", id: 899247664
+# mas "Things", id: 904280696
+# mas "Velja", id: 1607635845
+# mas "Xcode", id: 497799835
+# mas "Yoink", id: 457622435
 # vscode "arcanis.vscode-zipfs"
 # vscode "bazelbuild.vscode-bazel"
 # vscode "chwoerz.ts-worksheet"

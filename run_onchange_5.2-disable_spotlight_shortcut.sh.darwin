@@ -1,17 +1,17 @@
-# Check current setting for Command+Space Spotlight shortcut
-current_setting=$(defaults read com.apple.symbolichotkeys AppleSymbolicHotKeys | grep -A 10 '"64" =' | grep "enabled" | awk '{print $3}')
+# # Check current setting for Command+Space Spotlight shortcut
+# current_setting=$(defaults read com.apple.symbolichotkeys AppleSymbolicHotKeys | grep -A 10 '"64" =' | grep "enabled" | awk '{print $3}')
 
-# Desired setting (0 for disabled, 1 for enabled)
-desired_setting=0
+# # Desired setting (0 for disabled, 1 for enabled)
+# desired_setting=0
 
-# Only make changes if current setting doesn't match desired setting
-if [ "$current_setting" != "$desired_setting" ]; then
-    echo "Changing Spotlight shortcut setting..."
-    defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 64 "{enabled = $desired_setting; value = {parameters = (32, 49, 1048576); type = standard; }; }"
+# # Only make changes if current setting doesn't match desired setting
+# if [ "$current_setting" != "$desired_setting" ]; then
+#     echo "Changing Spotlight shortcut setting..."
+#     defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 64 "{enabled = $desired_setting; value = {parameters = (32, 49, 1048576); type = standard; }; }"
 
-    # Only restart SystemUIServer if we made a change
-    killall SystemUIServer
-    echo "SystemUIServer restarted with new settings."
-else
-    echo "Spotlight shortcut already set correctly. No changes needed."
-fi
+#     # Only restart SystemUIServer if we made a change
+#     killall SystemUIServer
+#     echo "SystemUIServer restarted with new settings."
+# else
+#     echo "Spotlight shortcut already set correctly. No changes needed."
+# fi
