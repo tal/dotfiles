@@ -17,6 +17,11 @@
           "label" : "maps",
           "type" : "url",
           "value" : "https://maps.google.com"
+        },
+        {
+          "key" : "c",
+          "type" : "application",
+          "value" : "/Applications/Google Chrome.app"
         }
       ],
       "key" : "w",
@@ -77,7 +82,7 @@
         {
           "key" : "g",
           "type" : "application",
-          "value" : ""
+          "value" : "/Users/tal.atlas/Applications/Chrome Apps.localized/Google Calendar.app"
         }
       ],
       "key" : "f",
