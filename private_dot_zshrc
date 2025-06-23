@@ -43,7 +43,8 @@ zstyle ':completion:*' menu select=2
 # Group completions by type
 zstyle ':completion:*' group-name ''
 
-alias claude="~/.claude/local/claude"
+# Claude
+export PATH="$HOME/.claude/local:$PATH"
 
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="$HOME/.sdkman"
