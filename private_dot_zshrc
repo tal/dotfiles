@@ -43,11 +43,18 @@ zstyle ':completion:*' menu select=2
 # Group completions by type
 zstyle ':completion:*' group-name ''
 
+# Load custom zsh config files (aliases, functions, etc.)
+if [ -d "$HOME/.config/zsh" ]; then
+    for config_file in "$HOME/.config/zsh"/*.zsh; do
+        [ -r "$config_file" ] && source "$config_file"
+    done
+fi
+
 # Claude
 export PATH="$HOME/.claude/local:$PATH"
+
+command -v dd-gitsign >/dev/null 2>&1 && eval "$(dd-gitsign load-key)"
 
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="$HOME/.sdkman"
 [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
-
-eval "$(dd-gitsign load-key)"
