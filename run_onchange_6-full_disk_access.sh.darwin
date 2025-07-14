@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# Add applications to Full Disk Access
+# This script uses tccutil to manage privacy permissions
+
+# Check if running with sudo
+if [ "$EUID" -ne 0 ]; then
+    echo "This script requires sudo privileges. Re-running with sudo..."
+    exec sudo "$0" "$@"
+fi
+
+echo "Adding applications to Full Disk Access..."
+
+# Applications to add to Full Disk Access
+apps=(
+    "/Applications/Warp.app"
+    "/Applications/LaunchBar.app"
+    "/Applications/Hammerspoon.app"
+)
+
+# Function to check if app is installed
+check_app_installed() {
+    local app_path="$1"
+    local app_name=$(basename "$app_path" .app)
+    
+    if [ -d "$app_path" ]; then
+        echo "✓ $app_name is installed"
+        return 0
+    else
+        echo "⚠ $app_name not found at $app_path - skipping"
+        return 1
+    fi
+}
+
+# Function to add app to Full Disk Access
+add_full_disk_access() {
+    local app_path="$1"
+    local app_name=$(basename "$app_path" .app)
+    
+    echo "Adding $app_name to Full Disk Access..."
+    tccutil reset SystemPolicyAllFiles "$app_path" 2>/dev/null || true
+    tccutil insert SystemPolicyAllFiles "$app_path" 2>/dev/null || true
+    echo "✓ $app_name added to Full Disk Access"
+}
+
+# Check installations and add to Full Disk Access
+installed_apps=()
+for app in "${apps[@]}"; do
+    if check_app_installed "$app"; then
+        installed_apps+=("$app")
+    fi
+done
+
+# Only proceed if at least one app is installed
+if [ ${#installed_apps[@]} -eq 0 ]; then
+    echo "No target applications found. Exiting."
+    exit 0
+fi
+
+echo ""
+echo "Adding installed applications to Full Disk Access..."
+
+# Add each installed application
+for app in "${installed_apps[@]}"; do
+    add_full_disk_access "$app"
+done
+
+echo ""
+echo "Full Disk Access setup complete!"
+echo "Note: You may need to manually approve these in System Preferences > Security & Privacy > Privacy > Full Disk Access"
