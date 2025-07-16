@@ -1,5 +1,9 @@
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+# Volta
+export VOLTA_HOME="$HOME/.volta"
+export PATH="$VOLTA_HOME/bin:$PATH"
+
 eval "$(starship init zsh)"
 
 [ -f /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh ] && source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
@@ -23,7 +27,7 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # PATH=~/.console-ninja/.bin:$PATH
 
 # datadog
-[ -s "~/.zshrc.dd" ] &&  source ~/.zshrc.dd
+[ -s ~/.zshrc.dd ] &&  source ~/.zshrc.dd
 
 # Load completion system
 autoload -Uz compinit
