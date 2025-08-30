@@ -9,6 +9,9 @@ source <(fzf --zsh)
 eval "$(zoxide init zsh)"
 
 
+# dnscontrol shell completion
+command -v dnscontrol >/dev/null 2>&1 && eval "$(dnscontrol shell-completion zsh)"
+
 # bun completions
 [ -s "/Users/tal/.bun/_bun" ] && source "/Users/tal/.bun/_bun"
 
