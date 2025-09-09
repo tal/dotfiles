@@ -8,6 +8,7 @@ eval "$(starship init zsh)"
 source <(fzf --zsh)
 eval "$(zoxide init zsh)"
 
+export PATH="$PATH:$HOME/.config/bin"
 
 # dnscontrol shell completion
 command -v dnscontrol >/dev/null 2>&1 && eval "$(dnscontrol shell-completion zsh)"
