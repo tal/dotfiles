@@ -1,0 +1,35 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+# Find ImageMagick "magick"
+MAGICK=${MAGICK:-$(command -v magick || true)}
+[[ -z "$MAGICK" && -x /opt/homebrew/bin/magick ]] && MAGICK=/opt/homebrew/bin/magick
+[[ -z "$MAGICK" && -x /usr/local/bin/magick ]] && MAGICK=/usr/local/bin/magick
+[[ -z "$MAGICK" ]] && { echo "ImageMagick 'magick' not found. Try: brew install imagemagick" >&2; exit 127; }
+
+# Help
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat <<'HLP'
+trim-png — trim PNG(s) to the minimal box around non-transparent pixels.
+
+Usage:
+  trim-png FILE.png [MORE.png ...]
+Env:
+  TRIM_PNG_FUZZ  Fuzz percent for near-transparent edges (default: 1%)
+HLP
+  exit 0
+fi
+
+[[ $# -ge 1 ]] || { echo "No files given. See: trim-png --help" >&2; exit 2; }
+
+FUZZ=${TRIM_PNG_FUZZ:-1%}
+
+for f in "$@"; do
+  [[ -f "$f" ]] || { echo "Skipping '$f' (not a file)" >&2; continue; }
+  dir="${f:h}"; base="${f:t:r}"
+  out="${dir}/${base}.trim.png"
+  n=1
+  while [[ -e "$out" ]]; do out="${dir}/${base}.trim.${n}.png"; ((n++)); done
+  "$MAGICK" "$f" -fuzz "$FUZZ" -trim +repage "$out"
+  echo "→ $out"
+done
