@@ -3,7 +3,8 @@
     "allow": [
       "Bash(ls:*)",
       "Bash(defaults read:*)",
-      "Bash(plutil:*)"
+      "Bash(plutil:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
