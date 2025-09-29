@@ -1,7 +1,7 @@
 # General aliases
-alias ll='eza -la'
-alias la='eza -A'
-alias l='eza -F'
+alias ll='lsd -la'
+alias la='lsd -A'
+alias l='lsd -F'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'

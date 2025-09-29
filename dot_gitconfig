@@ -5,6 +5,7 @@
         s  = status -sb
         br = branch
         ls = ls-files
+        aa = add --all
 
         # Modern Git commands
         sw = switch
@@ -55,6 +56,7 @@
         # Find stuff
         find-merge = "!sh -c 'commit=$0 && branch=${1:-HEAD} && (git rev-list $commit..$branch --ancestry-path | cat -n; git rev-list $commit..$branch --first-parent | cat -n) | sort -k2 -s | uniq -f1 -d | sort -n | tail -1 | cut -f2'"
         root = rev-parse --show-toplevel
+        sync = !"git fetch origin && git merge origin/$(git main)"
 
 [user]
         name = Tal Atlas
