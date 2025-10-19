@@ -48,9 +48,8 @@
     "command": "~/.claude/statusline.sh",
     "padding": 0
   },
-  "alwaysThinkingEnabled": false,
+  "alwaysThinkingEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754080668867
-  },
-  "model": "sonnet[1m]"
+  }
 }
