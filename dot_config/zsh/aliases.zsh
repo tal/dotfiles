@@ -28,3 +28,6 @@ alias bi='brew install'
 alias bs='brew search'
 alias bu='brew update && brew upgrade'
 alias binfo='brew info'
+
+# Claude aliases
+alias cyolo='claude --allow-dangerously-skip-permissions'
