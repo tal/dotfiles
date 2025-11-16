@@ -18,6 +18,9 @@ eval "$(zoxide init zsh)"
 
 export PATH="$PATH:$HOME/.config/bin"
 
+# Ripgrep configuration
+export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"
+
 # dnscontrol shell completion
 command -v dnscontrol >/dev/null 2>&1 && eval "$(dnscontrol shell-completion zsh)"
 
