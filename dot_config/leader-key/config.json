@@ -13,6 +13,7 @@
           "value" : "/System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app"
         },
         {
+          "iconPath" : "mappin.and.ellipse.circle.fill",
           "key" : "m",
           "label" : "maps",
           "type" : "url",
@@ -22,6 +23,11 @@
           "key" : "c",
           "type" : "application",
           "value" : "/Applications/Google Chrome.app"
+        },
+        {
+          "key" : "a",
+          "type" : "application",
+          "value" : "/Applications/ChatGPT Atlas.app"
         }
       ],
       "key" : "w",
