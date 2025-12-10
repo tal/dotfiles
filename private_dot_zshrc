@@ -36,6 +36,9 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # datadog
 [ -s ~/.zshrc.dd ] &&  source ~/.zshrc.dd
 
+# yarn switch
+[ -f "$HOME/.yarn/switch/env" ] && source "$HOME/.yarn/switch/env"
+
 # Load completion system
 autoload -Uz compinit
 compinit
