@@ -9,6 +9,8 @@
       "Bash(sed:*)",
       "Bash(awk:*)",
       "Bash(cat:*)",
+      "Bash(defaults read:*)",
+      "Bash(mdfind:*)",
       "Bash(git fetch:*)",
       "Bash(git pull:*)",
       "Bash(git status:*)",
@@ -43,10 +45,10 @@
       }
     ]
   },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/statusline.sh",
-    "padding": 0
+  "enabledPlugins": {
+    "dd@datadog-claude-plugins": true,
+    "plugin-dev@claude-code-plugins": true,
+    "ralph-wiggum@claude-code-plugins": true
   },
   "alwaysThinkingEnabled": true,
   "feedbackSurveyState": {
