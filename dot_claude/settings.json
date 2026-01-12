@@ -19,7 +19,8 @@
       "Bash(git branch:*)",
       "Bash(git show:*)",
       "Bash(git rev-parse:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(export:*)"
     ],
     "ask": [
       "Bash(rm:*)",
@@ -32,6 +33,7 @@
     ],
     "additionalDirectories": []
   },
+  "model": "opus",
   "hooks": {
     "Notification": [
       {
@@ -39,7 +41,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "terminal-notifier -title 'Claude Code' -message 'Input required' -sender com.anthropic.claudefordesktop -sound default"
+            "command": "bash ~/.claude/hooks/notify.sh",
+            "timeout": 5
           }
         ]
       }
@@ -47,10 +50,12 @@
   },
   "enabledPlugins": {
     "dd@datadog-claude-plugins": true,
-    "plugin-dev@claude-code-plugins": true,
-    "ralph-wiggum@claude-code-plugins": true
+    "plugin-dev@claude-code-plugins": false,
+    "ralph-wiggum@claude-code-plugins": false,
+    "plugin-dev@claude-plugins-official": true,
+    "ralph-wiggum@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": true
   },
-  "alwaysThinkingEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754080668867
   }

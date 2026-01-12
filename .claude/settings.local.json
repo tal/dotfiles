@@ -4,7 +4,10 @@
       "Bash(ls:*)",
       "Bash(defaults read:*)",
       "Bash(plutil:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(rsync:*)"
     ],
     "deny": []
   }
