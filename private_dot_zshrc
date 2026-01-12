@@ -39,6 +39,9 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # yarn switch
 [ -f "$HOME/.yarn/switch/env" ] && source "$HOME/.yarn/switch/env"
 
+# Google Cloud SDK
+[ -f "/opt/homebrew/share/google-cloud-sdk/path.zsh.inc" ] && source "/opt/homebrew/share/google-cloud-sdk/path.zsh.inc"
+
 # Load completion system
 autoload -Uz compinit
 compinit
@@ -76,3 +79,6 @@ command -v dd-gitsign >/dev/null 2>&1 && eval "$(dd-gitsign load-key)"
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="$HOME/.sdkman"
 [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+
+# Added by Craft Agent installer
+export PATH="$HOME/.local/bin:$PATH"
