@@ -9,3 +9,4 @@ alias ....='cd ../../..'
 # Claude aliases
 alias cyolo='claude --allow-dangerously-skip-permissions'
 alias cc='claude --allow-dangerously-skip-permissions'
+alias ccc='cc --continue'
