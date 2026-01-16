@@ -19,8 +19,7 @@
       "Bash(git branch:*)",
       "Bash(git show:*)",
       "Bash(git rev-parse:*)",
-      "Bash(git add:*)",
-      "Bash(export:*)"
+      "Bash(git add:*)"
     ],
     "ask": [
       "Bash(rm:*)",
@@ -31,9 +30,8 @@
       "Bash(git merge:*)",
       "Bash(git rebase:*)"
     ],
-    "additionalDirectories": []
+    "additionalDirectories": ["/tmp/"]
   },
-  "model": "opus",
   "hooks": {
     "Notification": [
       {
@@ -48,15 +46,20 @@
       }
     ]
   },
+  "env": {
+    "ENABLE_TOOL_SEARCH": "true"
+  },
   "enabledPlugins": {
     "dd@datadog-claude-plugins": true,
-    "plugin-dev@claude-code-plugins": false,
-    "ralph-wiggum@claude-code-plugins": false,
-    "plugin-dev@claude-plugins-official": true,
-    "ralph-wiggum@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true
+    "plugin-dev@claude-code-plugins": true,
+    "ralph-wiggum@claude-code-plugins": true
   },
+  "alwaysThinkingEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754080668867
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/tal.atlas/.claude/statusline-command.sh"
   }
 }
