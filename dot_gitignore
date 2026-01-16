@@ -1,0 +1,72 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim/
+*.sublime-project
+*.sublime-workspace
+.cursor/
+
+# General
+*.log
+*.pid
+.env.local
+.env.*.local
+.cache
+tmp/
+temp/
+claude-notifications.jsonl
+
+# Build artifacts
+dist/
+build/
+*.o
+*.so
+*.dylib
+*.exe
+
+# Package managers
+node_modules/
+.pnpm-store/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+ENV/
+.venv
+
+# Ruby
+*.gem
+.bundle/
+
+# Rust
+target/
+Cargo.lock
+
+# Go
+*.test
+vendor/
