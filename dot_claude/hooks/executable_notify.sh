@@ -129,7 +129,8 @@ cwd=$(echo "$payload" | jq -r '.cwd // ""')
 # Append payload with timestamp to .jsonl file in cwd
 if [ -n "$cwd" ] && [ -d "$cwd" ]; then
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  echo "$payload" | jq -c --arg ts "$timestamp" '. + {timestamp: $ts}' >> "$cwd/claude-notifications.jsonl"
+  timestamp_ny=$(TZ=America/New_York date +"%Y-%m-%dT%H:%M:%S%z")
+  echo "$payload" | jq -c --arg ts "$timestamp" --arg ts_ny "$timestamp_ny" '. + {timestamp: $ts, timestamp_ny: $ts_ny}' >> "$cwd/claude-notifications.jsonl"
 fi
 
 # Set title and sound based on notification type
