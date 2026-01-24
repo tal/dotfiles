@@ -51,8 +51,9 @@
   },
   "enabledPlugins": {
     "dd@datadog-claude-plugins": true,
-    "plugin-dev@claude-code-plugins": true,
-    "ralph-wiggum@claude-code-plugins": true
+    "plugin-dev@claude-plugins-official": true,
+    "ralph-wiggum@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "feedbackSurveyState": {
