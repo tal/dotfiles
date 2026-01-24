@@ -125,12 +125,59 @@ fi
 message=$(echo "$payload" | jq -r '.message // "Notification from Claude"')
 notification_type=$(echo "$payload" | jq -r '.notification_type // "unknown"')
 cwd=$(echo "$payload" | jq -r '.cwd // ""')
+transcript_file=$(echo "$payload" | jq -r '.transcript_file // ""')
 
-# Append payload with timestamp to .jsonl file in cwd
-if [ -n "$cwd" ] && [ -d "$cwd" ]; then
+# Read the last line and last USER message from the transcript file if available
+last_transcript_line=""
+last_user_message=""
+if [ -n "$transcript_file" ] && [ -f "$transcript_file" ]; then
+  # Get the last line of the transcript (any type)
+  last_transcript_line=$(tail -n 1 "$transcript_file" 2>/dev/null)
+
+  # Find the last line where type is "user" and extract the entire line
+  # Use tail -r to reverse since tac doesn't exist on macOS
+  last_user_message=$(tail -r "$transcript_file" 2>/dev/null | jq -r 'select(.type == "user")' | head -n 1)
+fi
+
+# Check for repeated notifications
+is_repeat="false"
+
+if [ -n "$last_user_message" ] && [ -n "$cwd" ]; then
+  # Create a cache file path specific to this cwd
+  cwd_hash=$(echo -n "$cwd" | shasum -a 256 | cut -d' ' -f1)
+  cache_file="${TMPDIR:-/tmp}/claude-notify-cache-${cwd_hash}.txt"
+
+  # Read cached last user message
+  if [ -f "$cache_file" ]; then
+    cached_user_message=$(cat "$cache_file" 2>/dev/null)
+    if [ "$cached_user_message" = "$last_user_message" ]; then
+      is_repeat="true"
+    fi
+  fi
+  # Update cache with current user message
+  echo "$last_user_message" > "$cache_file"
+fi
+
+# Append payload with timestamp to .jsonl file in cwd (only if logging is enabled)
+if [ -n "$ENABLE_CLAUDE_NOTIFICATION_LOGGING" ] && [ -n "$cwd" ] && [ -d "$cwd" ]; then
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   timestamp_ny=$(TZ=America/New_York date +"%Y-%m-%dT%H:%M:%S%z")
-  echo "$payload" | jq -c --arg ts "$timestamp" --arg ts_ny "$timestamp_ny" '. + {timestamp: $ts, timestamp_ny: $ts_ny}' >> "$cwd/claude-notifications.jsonl"
+
+  # Add the last transcript line to the log if available
+  if [ -n "$last_transcript_line" ]; then
+    echo "$payload" | jq -c --arg ts "$timestamp" --arg ts_ny "$timestamp_ny" --arg repeat "$is_repeat" --argjson transcript_line "$last_transcript_line" '. + {timestamp: $ts, timestamp_ny: $ts_ny, is_repeat: $repeat, last_transcript_line: $transcript_line}' >> "$cwd/claude-notifications.jsonl"
+  else
+    echo "$payload" | jq -c --arg ts "$timestamp" --arg ts_ny "$timestamp_ny" --arg repeat "$is_repeat" '. + {timestamp: $ts, timestamp_ny: $ts_ny, is_repeat: $repeat}' >> "$cwd/claude-notifications.jsonl"
+  fi
+
+  # Limit log file to 500 lines (keep only the most recent entries)
+  log_file="$cwd/claude-notifications.jsonl"
+  if [ -f "$log_file" ]; then
+    line_count=$(wc -l < "$log_file" | tr -d ' ')
+    if [ "$line_count" -gt 500 ]; then
+      tail -n 500 "$log_file" > "$log_file.tmp" && mv "$log_file.tmp" "$log_file"
+    fi
+  fi
 fi
 
 # Set title and sound based on notification type
@@ -156,6 +203,11 @@ case "$notification_type" in
     sound="default"
     ;;
 esac
+
+# Add repeat emoji to title if this is a repeated notification
+if [ "$is_repeat" = "true" ]; then
+  title="🔁 $title"
+fi
 
 # Add project context to message if cwd is available
 if [ -n "$cwd" ]; then
