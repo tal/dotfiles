@@ -2,7 +2,8 @@
 # Wraps 'chezmoi add' to automatically commit and push using Claude Code
 
 function chezmoi() {
-    local chezmoi_bin=$(which -a chezmoi | grep -v "^chezmoi: shell function" | head -n1)
+    # Find the real chezmoi binary, not this function
+    local chezmoi_bin=$(whence -p chezmoi)
 
     # If the command is 'add', wrap it with auto-commit
     if [[ "$1" == "add" ]]; then
