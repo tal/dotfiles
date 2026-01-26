@@ -12,6 +12,8 @@ eval "$(starship init zsh)"
 
 [ -f /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh ] && source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+[ -f ~/.letta-code/env ] && source ~/.letta-code/env
+source scripts/kafka.sh
 
 source <(fzf --zsh)
 eval "$(zoxide init zsh)"
@@ -35,6 +37,20 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 
 # datadog
 [ -s ~/.zshrc.dd ] &&  source ~/.zshrc.dd
+
+# dre-streams-jvm shortcuts
+if [ -d "${HOME}/dd/dre-streams-jvm" ]; then
+    source ${HOME}/dd/dre-streams-jvm/scripts/git-shortcuts
+    source ${HOME}/dd/dre-streams-jvm/scripts/k8s-shortcuts
+    source ${HOME}/dd/dre-streams-jvm/scripts/fzf-functions
+    source ${HOME}/dd/dre-streams-jvm/scripts/helpers.sh
+fi
+
+# dre shortcuts
+if [ -d "${HOME}/dd/dre" ]; then
+    source ${HOME}/dd/dre/scripts/k8s_aliases.sh
+    source ${HOME}/dd/dre/scripts/kafka.sh
+fi
 
 # yarn switch
 [ -f "$HOME/.yarn/switch/env" ] && source "$HOME/.yarn/switch/env"
