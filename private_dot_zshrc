@@ -13,7 +13,6 @@ eval "$(starship init zsh)"
 [ -f /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh ] && source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 [ -f ~/.letta-code/env ] && source ~/.letta-code/env
-source scripts/kafka.sh
 
 source <(fzf --zsh)
 eval "$(zoxide init zsh)"
