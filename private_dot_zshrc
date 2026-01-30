@@ -39,7 +39,6 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 
 # dre-streams-jvm shortcuts
 if [ -d "${HOME}/dd/dre-streams-jvm" ]; then
-    source ${HOME}/dd/dre-streams-jvm/scripts/git-shortcuts
     source ${HOME}/dd/dre-streams-jvm/scripts/k8s-shortcuts
     source ${HOME}/dd/dre-streams-jvm/scripts/fzf-functions
     source ${HOME}/dd/dre-streams-jvm/scripts/helpers.sh
