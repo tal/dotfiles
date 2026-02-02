@@ -37,6 +37,7 @@ Temporary Items
 tmp/
 temp/
 claude-notifications.jsonl
+*.local.md
 
 # Build artifacts
 dist/
