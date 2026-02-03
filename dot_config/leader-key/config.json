@@ -116,6 +116,16 @@
     {
       "actions" : [
         {
+          "key" : "o",
+          "type" : "application",
+          "value" : "/Applications/Codex.app"
+        },
+        {
+          "key" : "l",
+          "type" : "application",
+          "value" : "/Applications/Claude.app"
+        },
+        {
           "key" : "c",
           "type" : "application",
           "value" : "/Applications/ChatGPT.app"
