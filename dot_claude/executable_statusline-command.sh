@@ -10,6 +10,19 @@ basename=$(basename "$dir")
 # Get git branch (skip optional locks)
 branch=$(cd "$dir" 2>/dev/null && git -c core.fileMode=false -c gc.autodetach=false rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
+# Get PR URL for current branch (cached for 30s)
+pr_url=""
+if [ -n "$branch" ] && [ "$branch" != "main" ] && [ "$branch" != "master" ]; then
+  cache_file="/tmp/claude-statusline-pr-${dir//\//_}-${branch}"
+  cache_max_age=30
+  if [ -f "$cache_file" ] && [ $(($(date +%s) - $(stat -f %m "$cache_file" 2>/dev/null || echo 0))) -lt $cache_max_age ]; then
+    pr_url=$(cat "$cache_file")
+  else
+    pr_url=$(cd "$dir" 2>/dev/null && gh pr view --json url -q .url 2>/dev/null || echo "")
+    echo "$pr_url" > "$cache_file" 2>/dev/null
+  fi
+fi
+
 # Calculate context usage percentage
 usage=$(echo "$input" | jq '.context_window.current_usage')
 if [ "$usage" != "null" ]; then
@@ -60,5 +73,31 @@ fi
 
 # Add context usage
 output="${output}  ${CONTEXT_COLOR}${CIRCLE} ${pct}%${RESET}"
+
+# Detect OSC 8 hyperlink support (mirrors supports-hyperlinks npm package)
+supports_osc8() {
+  case "${TERM_PROGRAM:-}" in
+    iTerm.app|WezTerm|ghostty|vscode|zed|Hyper) return 0 ;;
+  esac
+  [ -n "${CURSOR_TRACE_ID:-}" ] && return 0
+  [ -n "${WT_SESSION:-}" ] && return 0
+  [ -n "${VTE_VERSION:-}" ] && return 0
+  case "${TERM:-}" in
+    *alacritty*|*kitty*) return 0 ;;
+  esac
+  return 1
+}
+
+# Add PR link if available (right side)
+if [ -n "$pr_url" ]; then
+  PR_COLOR="\033[34m"
+  if supports_osc8; then
+    # Terminal renders clickable links natively - use short label
+    output="${output}  ${PR_COLOR}\033]8;;${pr_url}\033\\\\PR\033]8;;\033\\\\${RESET}"
+  else
+    # No link support - show full URL
+    output="${output}  ${PR_COLOR}${pr_url}${RESET}"
+  fi
+fi
 
 echo -e "$output"
