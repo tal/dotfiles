@@ -1,5 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "ENABLE_TOOL_SEARCH": "true"
+  },
   "permissions": {
     "allow": [
       "Bash(ls:*)",
@@ -19,7 +22,12 @@
       "Bash(git branch:*)",
       "Bash(git show:*)",
       "Bash(git rev-parse:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:gist.githubusercontent.com)"
     ],
     "ask": [
       "Bash(rm:*)",
@@ -30,7 +38,9 @@
       "Bash(git merge:*)",
       "Bash(git rebase:*)"
     ],
-    "additionalDirectories": ["/tmp/"]
+    "additionalDirectories": [
+      "/tmp/"
+    ]
   },
   "hooks": {
     "Notification": [
@@ -46,8 +56,9 @@
       }
     ]
   },
-  "env": {
-    "ENABLE_TOOL_SEARCH": "true"
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline-command.sh"
   },
   "enabledPlugins": {
     "dd@datadog-claude-plugins": true,
@@ -59,8 +70,5 @@
   "feedbackSurveyState": {
     "lastShownTime": 1754080668867
   },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/statusline-command.sh"
-  }
+  "model": "opus"
 }
