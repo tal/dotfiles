@@ -10,3 +10,7 @@ focus-follows-mouse = true
 # When true, new windows/tabs/splits inherit the working directory of the focused window
 # Note: This affects both tabs AND splits together - can't be configured separately yet
 window-inherit-working-directory = true
+
+# Disable confirmation dialog when closing tabs/windows with active processes
+# Warning: This may result in data loss if programs can't recover gracefully
+confirm-close-surface = false
