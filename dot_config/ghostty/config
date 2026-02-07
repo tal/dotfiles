@@ -1,0 +1,12 @@
+# Ghostty Configuration
+
+# Theme
+theme = Cobalt2
+
+# Focus follows mouse - automatically focus pane under cursor
+focus-follows-mouse = true
+
+# Working directory for new tabs and splits
+# When true, new windows/tabs/splits inherit the working directory of the focused window
+# Note: This affects both tabs AND splits together - can't be configured separately yet
+window-inherit-working-directory = true
