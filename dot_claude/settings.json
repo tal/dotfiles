@@ -61,6 +61,6 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "/Users/tal.atlas/.claude/statusline-command.sh"
+    "command": "~/.claude/statusline.sh"
   }
 }
