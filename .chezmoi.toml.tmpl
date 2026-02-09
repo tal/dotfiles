@@ -1,0 +1,4 @@
+[git]
+    autoCommit = true
+    autoPush = true
+    commitMessageTemplate = '''{{ "{{" }} output "bash" "-c" "cd $(chezmoi source-path) && git diff --cached | claude -p --dangerously-skip-permissions 'Generate a commit message for these chezmoi dotfile changes. Use conventional commit format: type(scope): short description. Common types: feat, chore, fix. Output ONLY the commit message, no markdown, no backticks, no explanation.' 2>/dev/null || echo 'chore(dotfiles): update dotfiles'" {{ "}}" }}'''
