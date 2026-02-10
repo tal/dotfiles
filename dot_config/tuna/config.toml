@@ -2,17 +2,11 @@ schemaVersion = 1
 
 [catalogs]
 disabledIdentifiers = [
-    'Tuna.Internal.ApplicationProxyCatalog',
     'TunaAutomation.QuickActionsCatalog',
     'TunaAutomation.ScriptsCatalog',
-    'TunaAutomation.ShortcutsCatalog',
-    'TunaContacts.ContactsCatalog',
-    'TunaCore.RecentsCatalog',
+    'TunaCore.FinderFavoritesCatalog',
     'TunaCore.RecentsSearchCatalog',
-    'TunaCore.RunningProcessesCatalog',
-    'TunaCore.TextActionsCatalog',
     'TunaDevices.DevicesCatalog',
-    'TunaEmoji.EmojiCatalog',
     'TunaNotes.NotesSearchCatalog',
     'TunaObsidian.ObsidianNotesCatalog',
     'TunaObsidian.ObsidianSearchCatalog',
@@ -25,33 +19,21 @@ disabledIdentifiers = [
     'TunaSafari.SafariFavoritesSearchCatalog',
     'TunaSafari.SafariMetaCatalog',
     'TunaSafari.SafariReadingListCatalog',
-    'TunaSafari.SafariReadingListSearchCatalog',
-    'TunaSmartLinks.SmartLinksActionsCatalog',
-    'TunaSmartLinks.SmartLinksCatalog',
-    'TunaSystem.WindowManagementCatalog'
+    'TunaSafari.SafariReadingListSearchCatalog'
 ]
 disabledItemKeys = []
 sortOrders = []
 
-[[leaderMode.bindings]]
-key = 's'
-url = 'tuna://run/path.%252FApplications%252FSafari.app/Open'
+[hotkeys]
+custom = []
 
-[[leaderMode.bindings]]
-key = 't'
-url = 'tuna://run/path.%252FSystem%252FApplications%252FUtilities%252FTerminal.app/Open'
+    [hotkeys.app.activate]
+    carbonKeyCode = 49
+    carbonModifiers = 4096
 
-[[leaderMode.bindings]]
-key = 'f'
-url = 'tuna://run/path.%252FSystem%252FLibrary%252FCoreServices%252FFinder.app/Open'
-
-[[leaderMode.bindings]]
-key = 'm'
-url = 'tuna://run/path.%252FSystem%252FApplications%252FMessages.app/Open'
-
-[[leaderMode.bindings]]
-key = 'n'
-url = 'tuna://run/path.%252FSystem%252FApplications%252FNotes.app/Open'
+    [hotkeys.app.leaderMode]
+    carbonKeyCode = 6
+    carbonModifiers = 4096
 
 [[leaderMode.bindings]]
 key = 'd'
@@ -62,6 +44,7 @@ key = 'h'
 url = 'tuna://run/path.%252FUsers%252Ftal.atlas/Open'
 
 [[leaderMode.bindings]]
+iconPath = '/Applications/Arc.app'
 key = 'w'
 
     [[leaderMode.bindings.children]]
@@ -72,11 +55,68 @@ key = 'w'
     key = 'c'
     url = 'tuna://run/TunaCore.AllApplicationsCatalog.Google%20Chrome/Open'
 
+    [[leaderMode.bindings.children]]
+    key = 's'
+    url = 'tuna://run/TunaCore.AllApplicationsCatalog.Safari/Open'
+
+[[leaderMode.bindings]]
+iconPath = 'person.2.fill'
+key = 'a'
+label = 'Messages'
+
+    [[leaderMode.bindings.children]]
+    key = 'w'
+    url = 'tuna://run/TunaCore.AllApplicationsCatalog.WhatsApp/Open'
+
+    [[leaderMode.bindings.children]]
+    key = 'a'
+    url = 'tuna://run/TunaCore.AllApplicationsCatalog.Messages/Open'
+
+[[leaderMode.bindings]]
+key = 'c'
+url = 'tuna://run/TunaCore.AllApplicationsCatalog.Slack/Open'
+
+[[leaderMode.bindings]]
+key = 'z'
+url = 'tuna://run/TunaCore.AllApplicationsCatalog.zoom.us/Open'
+
+[[leaderMode.bindings]]
+key = 'm'
+url = 'tuna://run/TunaCore.AllApplicationsCatalog.Spotify/Open'
+
+[[leaderMode.bindings]]
+key = 'n'
+url = 'tuna://run/TunaCore.AllApplicationsCatalog.Craft/Open'
+
+[[leaderMode.bindings]]
+key = 'e'
+
+    [[leaderMode.bindings.children]]
+    key = 'e'
+    url = 'tuna://run/TunaCore.AllApplicationsCatalog.Shortwave/Open'
+
+[[leaderMode.bindings]]
+
 [settings]
+leaderModeCheatsheetBehavior = 'always'
+leaderModeCheatsheetExpandGroups = true
 themeIdentifier = 'com.brnbw.tuna.themes.default'
+typingTimeoutDuration = 0.5
+
+[[catalogSettings]]
+catalogIdentifier = 'TunaCore.TextActionsCatalog'
+
+    [catalogSettings.values]
+    TextActionsFileExtension = 'txt'
+
+[[catalogSettings]]
+catalogIdentifier = 'TunaEmoji.EmojiCatalog'
+
+    [catalogSettings.values]
+    EmojiSkinTone = 'default'
 
 [[catalogSettings]]
 catalogIdentifier = 'com.brnbw.tuna.themes.default'
 
     [catalogSettings.values]
-    ThemeTint = 'custom:A500FF'
+    ThemeTint = 'custom:5000BA'
