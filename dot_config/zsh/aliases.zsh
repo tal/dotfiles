@@ -8,5 +8,31 @@ alias ....='cd ../../..'
 
 # Claude aliases
 alias cyolo='claude --allow-dangerously-skip-permissions'
-alias cc='claude --allow-dangerously-skip-permissions'
-alias ccc='cc --continue'
+
+# cc function with shorthand parameter support
+cc() {
+  local args=()
+
+  # If no parameters, just call the base command
+  if [[ $# -eq 0 ]]; then
+    claude --allow-dangerously-skip-permissions
+    return
+  fi
+
+  # Process parameters
+  for arg in "$@"; do
+    case "$arg" in
+      c)
+        args+=(--continue)
+        ;;
+      r)
+        args+=(--resume)
+        ;;
+      *)
+        args+=("$arg")
+        ;;
+    esac
+  done
+
+  claude --allow-dangerously-skip-permissions "${args[@]}"
+}
