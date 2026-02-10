@@ -71,3 +71,4 @@ Cargo.lock
 # Go
 *.test
 vendor/
+.letta
