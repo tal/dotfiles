@@ -1,0 +1,82 @@
+schemaVersion = 1
+
+[catalogs]
+disabledIdentifiers = [
+    'Tuna.Internal.ApplicationProxyCatalog',
+    'TunaAutomation.QuickActionsCatalog',
+    'TunaAutomation.ScriptsCatalog',
+    'TunaAutomation.ShortcutsCatalog',
+    'TunaContacts.ContactsCatalog',
+    'TunaCore.RecentsCatalog',
+    'TunaCore.RecentsSearchCatalog',
+    'TunaCore.RunningProcessesCatalog',
+    'TunaCore.TextActionsCatalog',
+    'TunaDevices.DevicesCatalog',
+    'TunaEmoji.EmojiCatalog',
+    'TunaNotes.NotesSearchCatalog',
+    'TunaObsidian.ObsidianNotesCatalog',
+    'TunaObsidian.ObsidianSearchCatalog',
+    'TunaObsidian.ObsidianVaultsCatalog',
+    'TunaReminders.RemindersSearchCatalog',
+    'TunaSafari.SafariActionsCatalog',
+    'TunaSafari.SafariBookmarksCatalog',
+    'TunaSafari.SafariBookmarksSearchCatalog',
+    'TunaSafari.SafariFavoritesCatalog',
+    'TunaSafari.SafariFavoritesSearchCatalog',
+    'TunaSafari.SafariMetaCatalog',
+    'TunaSafari.SafariReadingListCatalog',
+    'TunaSafari.SafariReadingListSearchCatalog',
+    'TunaSmartLinks.SmartLinksActionsCatalog',
+    'TunaSmartLinks.SmartLinksCatalog',
+    'TunaSystem.WindowManagementCatalog'
+]
+disabledItemKeys = []
+sortOrders = []
+
+[[leaderMode.bindings]]
+key = 's'
+url = 'tuna://run/path.%252FApplications%252FSafari.app/Open'
+
+[[leaderMode.bindings]]
+key = 't'
+url = 'tuna://run/path.%252FSystem%252FApplications%252FUtilities%252FTerminal.app/Open'
+
+[[leaderMode.bindings]]
+key = 'f'
+url = 'tuna://run/path.%252FSystem%252FLibrary%252FCoreServices%252FFinder.app/Open'
+
+[[leaderMode.bindings]]
+key = 'm'
+url = 'tuna://run/path.%252FSystem%252FApplications%252FMessages.app/Open'
+
+[[leaderMode.bindings]]
+key = 'n'
+url = 'tuna://run/path.%252FSystem%252FApplications%252FNotes.app/Open'
+
+[[leaderMode.bindings]]
+key = 'd'
+url = 'tuna://run/path.%252FUsers%252Ftal.atlas%252FDownloads/Open'
+
+[[leaderMode.bindings]]
+key = 'h'
+url = 'tuna://run/path.%252FUsers%252Ftal.atlas/Open'
+
+[[leaderMode.bindings]]
+key = 'w'
+
+    [[leaderMode.bindings.children]]
+    key = 'w'
+    url = 'tuna://run/TunaCore.AllApplicationsCatalog.Arc/Open'
+
+    [[leaderMode.bindings.children]]
+    key = 'c'
+    url = 'tuna://run/TunaCore.AllApplicationsCatalog.Google%20Chrome/Open'
+
+[settings]
+themeIdentifier = 'com.brnbw.tuna.themes.default'
+
+[[catalogSettings]]
+catalogIdentifier = 'com.brnbw.tuna.themes.default'
+
+    [catalogSettings.values]
+    ThemeTint = 'custom:A500FF'
