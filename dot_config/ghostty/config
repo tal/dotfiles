@@ -14,3 +14,6 @@ window-inherit-working-directory = true
 # Disable confirmation dialog when closing tabs/windows with active processes
 # Warning: This may result in data loss if programs can't recover gracefully
 confirm-close-surface = false
+
+# Split pane divider color
+split-divider-color = #6A5ACD
