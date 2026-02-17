@@ -12,22 +12,63 @@
       "Bash(sed:*)",
       "Bash(awk:*)",
       "Bash(cat:*)",
+      "Bash(code:*)",
+      "Bash(curl:*)",
+      "Bash(chezmoi cat:*)",
+      "Bash(chezmoi data:*)",
+      "Bash(chezmoi diff:*)",
+      "Bash(chezmoi doctor:*)",
+      "Bash(chezmoi dump:*)",
+      "Bash(chezmoi managed:*)",
+      "Bash(chezmoi source-path:*)",
+      "Bash(chezmoi status:*)",
+      "Bash(chezmoi target-path:*)",
+      "Bash(chezmoi verify:*)",
       "Bash(defaults read:*)",
-      "Bash(mdfind:*)",
-      "Bash(git fetch:*)",
-      "Bash(git pull:*)",
-      "Bash(git status:*)",
-      "Bash(git log:*)",
+      "Bash(echo:*)",
+      "Bash(gh api:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh browse:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
       "Bash(git diff:*)",
-      "Bash(git branch:*)",
-      "Bash(git show:*)",
+      "Bash(git diff-tree:*)",
+      "Bash(git fetch:*)",
+      "Bash(git log:*)",
+      "Bash(git pull:*)",
       "Bash(git rev-parse:*)",
+      "Bash(git show:*)",
+      "Bash(git status:*)",
       "Bash(git add:*)",
+      "Bash(git branch:*)",
+      "Bash(hash -r)",
+      "Bash(launchctl list:*)",
+      "Bash(mdfind:*)",
+      "Bash(tac:*)",
+      "Bash(xargs rg:*)",
       "WebSearch",
+      "WebFetch(domain:datadoghq.atlassian.net)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:gist.github.com)",
-      "WebFetch(domain:gist.githubusercontent.com)"
+      "WebFetch(domain:gist.githubusercontent.com)",
+      "WebFetch(domain:gitlab.ddbuild.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "mcp__atlassian__atlassianUserInfo",
+      "mcp__atlassian__getAccessibleAtlassianResources",
+      "mcp__atlassian__getConfluencePage",
+      "mcp__atlassian__getJiraIssue",
+      "mcp__atlassian__getJiraProjectIssueTypesMetadata",
+      "mcp__atlassian__getVisibleJiraProjects",
+      "mcp__atlassian__search",
+      "mcp__atlassian__searchConfluenceUsingCql",
+      "mcp__atlassian__searchJiraIssuesUsingJql",
+      "mcp__datadog__get_datadog_metric",
+      "mcp__datadog__search_datadog_spans",
+      "mcp__ide__getDiagnostics"
     ],
     "ask": [
       "Bash(rm:*)",
@@ -42,6 +83,7 @@
       "/tmp/"
     ]
   },
+  "model": "opus",
   "hooks": {
     "Notification": [
       {
@@ -60,15 +102,23 @@
     "type": "command",
     "command": "~/.claude/statusline-command.sh"
   },
+  "extraKnownMarketplaces": {
+    "tal-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "DataDog/tal-marketplace"
+      }
+    }
+  },
   "enabledPlugins": {
-    "dd@datadog-claude-plugins": true,
     "plugin-dev@claude-plugins-official": true,
     "ralph-wiggum@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true
+    "swift-lsp@claude-plugins-official": true,
+    "dd@datadog-claude-plugins": true
   },
   "alwaysThinkingEnabled": true,
+  "skipDangerousModePermissionPrompt": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754080668867
-  },
-  "model": "opus"
+  }
 }
