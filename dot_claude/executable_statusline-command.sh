@@ -3,9 +3,20 @@
 # Read stdin JSON input
 input=$(cat)
 
-# Extract workspace directory
-dir=$(echo "$input" | jq -r '.workspace.current_dir')
-basename=$(basename "$dir")
+# Extract workspace directories
+initial_dir=$(echo "$input" | jq -r '.workspace.project_dir')
+current_dir=$(echo "$input" | jq -r '.workspace.current_dir')
+dir="$current_dir"  # Keep for git operations
+
+# Format directory display: show initial dir with current dir in parentheses if different
+initial_basename=$(basename "$initial_dir")
+current_basename=$(basename "$current_dir")
+
+if [ "$initial_dir" = "$current_dir" ]; then
+  dir_display="$initial_basename"
+else
+  dir_display="$initial_basename ($current_basename)"
+fi
 
 # Get git branch (skip optional locks)
 branch=$(cd "$dir" 2>/dev/null && git -c core.fileMode=false -c gc.autodetach=false rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
@@ -64,7 +75,7 @@ else
 fi
 
 # Build output with colors
-output="${DIR_COLOR}${basename}${RESET}"
+output="${DIR_COLOR}${dir_display}${RESET}"
 
 # Add branch if present
 if [ -n "$branch" ]; then
