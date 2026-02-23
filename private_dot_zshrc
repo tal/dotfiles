@@ -68,8 +68,17 @@ zstyle ':completion:*:approximate:*' max-errors 1 numeric
 # Case-insensitive completion
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
-# Show completion menu when number of options is at least 2
-zstyle ':completion:*' menu select=2
+# List completions and cycle through them (don't auto-select first)
+zstyle ':completion:*' menu select
+setopt AUTO_LIST           # List choices on ambiguous completion
+setopt LIST_AMBIGUOUS      # Show list immediately when ambiguous
+unsetopt MENU_COMPLETE     # Don't insert first match immediately
+
+# Format completion list with descriptions and group headers
+zstyle ':completion:*' list-colors ''
+zstyle ':completion:*:descriptions' format '%F{green}-- %d --%f'
+zstyle ':completion:*:messages' format '%F{yellow}-- %d --%f'
+zstyle ':completion:*:warnings' format '%F{red}-- no matches found --%f'
 
 # Group completions by type
 zstyle ':completion:*' group-name ''
