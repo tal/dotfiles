@@ -1,7 +1,7 @@
 # Ghostty Configuration
 
 # Theme
-theme = Cobalt2
+theme = Neon
 
 # Focus follows mouse - automatically focus pane under cursor
 focus-follows-mouse = true
@@ -16,4 +16,4 @@ window-inherit-working-directory = true
 confirm-close-surface = false
 
 # Split pane divider color
-split-divider-color = #6A5ACD
+split-divider-color = #bf00ff
