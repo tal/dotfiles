@@ -24,7 +24,7 @@ layout: tree
 
 recursion:
   enabled: true
-  depth: 1
+  depth: 2
 
 size: default
 
