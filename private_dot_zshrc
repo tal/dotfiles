@@ -6,7 +6,15 @@ fi
 
 eval "$(starship init zsh)"
 
+# Configure zsh-autocomplete
+zstyle ':autocomplete:*complete*:*' insert-unambiguous yes  # Only insert the unambiguous part first
 [ -f /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh ] && source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
+# Override Tab binding AFTER plugin loads — use menu-select to show and cycle through matches
+bindkey '^I' menu-select
+bindkey "$terminfo[kcbt]" menu-select
+# Inside the menu: Tab cycles forward, Shift+Tab cycles backward (instead of arrow-key navigation)
+bindkey -M menuselect '^I' menu-complete
+bindkey -M menuselect "$terminfo[kcbt]" reverse-menu-complete
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 [ -f ~/.letta-code/env ] && source ~/.letta-code/env
 
