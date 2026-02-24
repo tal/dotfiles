@@ -1,0 +1,127 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+CHEZMOI=${CHEZMOI:-$(command -v chezmoi)}
+[[ -z "$CHEZMOI" ]] && { echo "chezmoi not found" >&2; exit 127; }
+
+# Help
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat <<'HLP'
+chez — Template-aware chezmoi add wrapper
+
+Usage:
+  chez add <file> [<file> ...]   Add files, preserving .tmpl directives
+  chez <command> [args ...]      Passthrough to chezmoi
+
+For template-managed files, chez diffs the rendered output against the
+actual file and patches the template source, preserving directives.
+HLP
+  exit 0
+fi
+
+# Non-add commands → passthrough
+if [[ "${1:-}" != "add" ]]; then
+  exec $CHEZMOI "$@"
+fi
+
+shift
+
+# Separate flags from file arguments
+flags=()
+files=()
+for arg in "$@"; do
+  if [[ "$arg" == -* ]]; then
+    flags+=("$arg")
+  else
+    files+=("$arg")
+  fi
+done
+
+[[ ${#files[@]} -ge 1 ]] || { echo "No files given. See: chez --help" >&2; exit 2; }
+
+# Temp directory with cleanup
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+source_dir=$($CHEZMOI source-path)
+had_template=false
+had_failure=false
+
+for file in "${files[@]}"; do
+  # Resolve to absolute path
+  target=$(realpath "$file" 2>/dev/null || echo "$file")
+
+  # Get the source path for this file
+  src=$($CHEZMOI source-path "$target" 2>/dev/null || true)
+
+  # If not managed or not a template, fall through to chezmoi add
+  if [[ -z "$src" || "$src" != *.tmpl ]]; then
+    echo "Adding $target via chezmoi add..."
+    $CHEZMOI add ${flags[@]+"${flags[@]}"} "$target"
+    continue
+  fi
+
+  # --- Template file handling ---
+  had_template=true
+  echo "Template detected: ${src#$source_dir/}"
+
+  # 1. Get rendered output (what the template currently produces)
+  rendered="$tmpdir/rendered.$(basename "$file")"
+  $CHEZMOI cat "$target" > "$rendered"
+
+  # 2. Diff rendered vs actual — if identical, nothing to do
+  patchfile="$tmpdir/changes.patch"
+  if diff -u "$rendered" "$target" > "$patchfile"; then
+    echo "✓ No changes to apply for $target"
+    continue
+  fi
+
+  # 3. Backup the template source
+  backup="$tmpdir/$(basename "$src").bak"
+  cp "$src" "$backup"
+
+  # 4. Patch the template source
+  echo "Patching template source..."
+  if patch --fuzz=3 "$src" "$patchfile"; then
+    # 5. Verify: rendered output should now match actual file
+    verify="$tmpdir/verify.$(basename "$file")"
+    $CHEZMOI cat "$target" > "$verify"
+
+    if diff -q "$verify" "$target" > /dev/null 2>&1; then
+      echo "✓ Template updated successfully for $target"
+    else
+      echo "⚠ Verification failed — rendered output doesn't match actual file" >&2
+      echo "  Restoring backup..." >&2
+      cp "$backup" "$src"
+      echo "  Template restored. Use 'chezmoi edit $target' to manually edit." >&2
+      had_failure=true
+    fi
+  else
+    echo "⚠ Patch failed for $target" >&2
+    cp "$backup" "$src"
+    echo "  Template restored. Use 'chezmoi edit $target' to manually edit." >&2
+    had_failure=true
+  fi
+done
+
+# Auto-commit/push for template changes (bypasses chezmoi's autoCommit)
+if $had_template && ! $had_failure; then
+  (
+    cd "$source_dir"
+    if [[ -n $(git status --porcelain) ]]; then
+      echo "\nCommitting changes with Claude Code..."
+      if claude --dangerously-skip-permissions -p commit; then
+        echo "\nPushing to remote..."
+        git push || echo "\n⚠ Push failed. You can manually push in: $source_dir"
+      else
+        echo "\n❌ Commit failed. You can manually commit in: $source_dir"
+      fi
+    else
+      echo "\n✓ No changes to commit"
+    fi
+  ) || true
+fi
+
+if $had_failure; then
+  exit 1
+fi
