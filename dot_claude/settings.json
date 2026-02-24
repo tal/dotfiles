@@ -38,18 +38,19 @@
       "Bash(git merge:*)",
       "Bash(git rebase:*)"
     ],
-    "additionalDirectories": ["/tmp/"]
+    "additionalDirectories": [
+      "/tmp/"
+    ]
   },
   "model": "opus",
   "hooks": {
-    "Notification": [
+    "SessionStart": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/notify.sh",
-            "timeout": 5
+            "command": "if [ -f .env ]; then set -a; source .env; set +a; env >> \"$CLAUDE_ENV_FILE\"; fi"
           }
         ]
       }
@@ -63,8 +64,11 @@
     "dd@datadog-claude-plugins": true,
     "plugin-dev@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
+    "swift-concurrency@swift-concurrency-agent-skill": true,
     "smart-notifications@tal-marketplace": true,
-    "tal@tal-marketplace": true
+    "tal@tal-marketplace": true,
+    "plan-refiner@tal-marketplace": true,
+    "typescript-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "skipDangerousModePermissionPrompt": true,
