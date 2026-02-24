@@ -9,13 +9,36 @@ current_dir=$(echo "$input" | jq -r '.workspace.current_dir')
 dir="$current_dir"  # Keep for git operations
 
 # Format directory display: show initial dir with current dir in parentheses if different
-initial_basename=$(basename "$initial_dir")
-current_basename=$(basename "$current_dir")
+# Use ~/name for directories directly in the home folder
+# Special case: .claude directories always show parent for context
+initial_name=$(basename "$initial_dir")
+parent_dir=$(dirname "$initial_dir")
 
+if [ "$initial_name" = ".claude" ]; then
+  if [ "$parent_dir" = "$HOME" ]; then
+    initial_basename="~/.claude"
+  elif [ "$(dirname "$parent_dir")" = "$HOME" ]; then
+    initial_basename="~/$(basename "$parent_dir")/.claude"
+  else
+    initial_basename="$(basename "$parent_dir")/.claude"
+  fi
+elif [ "$parent_dir" = "$HOME" ]; then
+  initial_basename="~/$(basename "$initial_dir")"
+else
+  initial_basename=$(basename "$initial_dir")
+fi
+# Compute relative path from project_dir to current_dir
 if [ "$initial_dir" = "$current_dir" ]; then
   dir_display="$initial_basename"
 else
-  dir_display="$initial_basename ($current_basename)"
+  # Strip the project root prefix to get a relative path, then add trailing slash
+  rel_path="${current_dir#"$initial_dir"}"
+  # rel_path will be like "/src/components"; strip leading slash and add trailing
+  rel_path="${rel_path#/}"
+  if [ -z "$rel_path" ]; then
+    rel_path="$(basename "$current_dir")"
+  fi
+  dir_display="$initial_basename (${rel_path}/)"
 fi
 
 # Get git branch (skip optional locks)
