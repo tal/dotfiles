@@ -5,8 +5,9 @@ disabledIdentifiers = [
     'TunaAutomation.QuickActionsCatalog',
     'TunaAutomation.ScriptsCatalog',
     'TunaCore.FinderFavoritesCatalog',
-    'TunaCore.RecentsSearchCatalog',
+    'TunaCore.RunningProcessesCatalog',
     'TunaDevices.DevicesCatalog',
+    'TunaEmoji.EmojiCatalog',
     'TunaNotes.NotesSearchCatalog',
     'TunaObsidian.ObsidianNotesCatalog',
     'TunaObsidian.ObsidianSearchCatalog',
@@ -29,19 +30,11 @@ custom = []
 
     [hotkeys.app.activate]
     carbonKeyCode = 49
-    carbonModifiers = 4096
+    carbonModifiers = 256
 
     [hotkeys.app.leaderMode]
     carbonKeyCode = 6
     carbonModifiers = 4096
-
-[[leaderMode.bindings]]
-key = 'd'
-url = 'tuna://run/path.%252FUsers%252Ftal.atlas%252FDownloads/Open'
-
-[[leaderMode.bindings]]
-key = 'h'
-url = 'tuna://run/path.%252FUsers%252Ftal.atlas/Open'
 
 [[leaderMode.bindings]]
 iconPath = '/Applications/Arc.app'
@@ -57,7 +50,7 @@ key = 'w'
 
     [[leaderMode.bindings.children]]
     key = 's'
-    url = 'tuna://run/TunaCore.AllApplicationsCatalog.Safari/Open'
+    url = 'tuna://run/TunaCore.SystemApplicationsCatalog.Safari/Open'
 
 [[leaderMode.bindings]]
 iconPath = 'person.2.fill'
@@ -70,7 +63,7 @@ label = 'Messages'
 
     [[leaderMode.bindings.children]]
     key = 'a'
-    url = 'tuna://run/TunaCore.AllApplicationsCatalog.Messages/Open'
+    url = 'tuna://run/TunaCore.SystemApplicationsCatalog.Messages/Open'
 
 [[leaderMode.bindings]]
 key = 'c'
@@ -89,6 +82,7 @@ key = 'n'
 url = 'tuna://run/TunaCore.AllApplicationsCatalog.Craft/Open'
 
 [[leaderMode.bindings]]
+iconPath = '/System/Applications/Mail.app'
 key = 'e'
 
     [[leaderMode.bindings.children]]
@@ -96,12 +90,34 @@ key = 'e'
     url = 'tuna://run/TunaCore.AllApplicationsCatalog.Shortwave/Open'
 
 [[leaderMode.bindings]]
+key = 'p'
+url = 'tuna://run/Tuna.Internal.RecentObjectsCatalog.1Password/Open'
 
 [settings]
 leaderModeCheatsheetBehavior = 'always'
 leaderModeCheatsheetExpandGroups = true
 themeIdentifier = 'com.brnbw.tuna.themes.default'
 typingTimeoutDuration = 0.5
+
+[[smartLinks.entries]]
+enabled = true
+name = 'Google'
+template = 'https://www.google.com/search?q={{input}}'
+
+[[smartLinks.entries]]
+enabled = true
+name = 'Stack Overflow'
+template = 'https://stackoverflow.com/search?q={{input}}'
+
+[[smartLinks.entries]]
+enabled = true
+name = 'Wikipedia'
+template = 'https://en.wikipedia.org/wiki/Special:Search?search={{input}}'
+
+[[smartLinks.entries]]
+enabled = true
+name = 'YouTube'
+template = 'https://www.youtube.com/results?search_query={{input}}'
 
 [[catalogSettings]]
 catalogIdentifier = 'TunaCore.TextActionsCatalog'
