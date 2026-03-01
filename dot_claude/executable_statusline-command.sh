@@ -8,37 +8,51 @@ initial_dir=$(echo "$input" | jq -r '.workspace.project_dir')
 current_dir=$(echo "$input" | jq -r '.workspace.current_dir')
 dir="$current_dir"  # Keep for git operations
 
-# Format directory display: show initial dir with current dir in parentheses if different
-# Use ~/name for directories directly in the home folder
-# Special case: .claude directories always show parent for context
+# Resolve project name: PROJECT_NAME env var > git remote > directory name
 initial_name=$(basename "$initial_dir")
 parent_dir=$(dirname "$initial_dir")
 
-if [ "$initial_name" = ".claude" ]; then
-  if [ "$parent_dir" = "$HOME" ]; then
-    initial_basename="~/.claude"
-  elif [ "$(dirname "$parent_dir")" = "$HOME" ]; then
-    initial_basename="~/$(basename "$parent_dir")/.claude"
-  else
-    initial_basename="$(basename "$parent_dir")/.claude"
-  fi
-elif [ "$parent_dir" = "$HOME" ]; then
-  initial_basename="~/$(basename "$initial_dir")"
+if [ -n "${PROJECT_NAME:-}" ]; then
+  project_name="$PROJECT_NAME"
 else
-  initial_basename=$(basename "$initial_dir")
+  # Try git remote name
+  project_name=$(cd "$dir" 2>/dev/null && git remote get-url origin 2>/dev/null | sed 's/.*\///;s/\.git$//' || echo "")
 fi
-# Compute relative path from project_dir to current_dir
+
+# Fallback to directory-based name
+if [ -z "$project_name" ]; then
+  if [ "$initial_name" = ".claude" ]; then
+    if [ "$parent_dir" = "$HOME" ]; then
+      project_name="~/.claude"
+    elif [ "$(dirname "$parent_dir")" = "$HOME" ]; then
+      project_name="~/$(basename "$parent_dir")/.claude"
+    else
+      project_name="$(basename "$parent_dir")/.claude"
+    fi
+  elif [ "$parent_dir" = "$HOME" ]; then
+    project_name="~/$(basename "$initial_dir")"
+  else
+    project_name=$(basename "$initial_dir")
+  fi
+fi
+
+# Detect if in a git worktree
+worktree_name=""
+git_dir_path=$(cd "$dir" 2>/dev/null && git rev-parse --git-dir 2>/dev/null || echo "")
+if [[ "$git_dir_path" == */worktrees/* ]]; then
+  worktree_name="$initial_name"
+fi
+
+# Build dir_display: project name + relative path (same whether in worktree or not)
 if [ "$initial_dir" = "$current_dir" ]; then
-  dir_display="$initial_basename"
+  dir_display="$project_name"
 else
-  # Strip the project root prefix to get a relative path, then add trailing slash
   rel_path="${current_dir#"$initial_dir"}"
-  # rel_path will be like "/src/components"; strip leading slash and add trailing
   rel_path="${rel_path#/}"
   if [ -z "$rel_path" ]; then
     rel_path="$(basename "$current_dir")"
   fi
-  dir_display="$initial_basename (${rel_path}/)"
+  dir_display="$project_name (${rel_path}/)"
 fi
 
 # Get git branch (skip optional locks)
@@ -122,7 +136,7 @@ supports_osc8() {
   return 1
 }
 
-# Add PR link if available (right side)
+# Add PR link if available
 if [ -n "$pr_url" ]; then
   PR_COLOR="\033[34m"
   if supports_osc8; then
@@ -132,6 +146,12 @@ if [ -n "$pr_url" ]; then
     # No link support - show full URL
     output="${output}  ${PR_COLOR}${pr_url}${RESET}"
   fi
+fi
+
+# Add worktree name at the end in light grey
+if [ -n "$worktree_name" ]; then
+  GREY="\033[90m"
+  output="${output}  ${GREY}worktree: ${worktree_name}${RESET}"
 fi
 
 echo -e "$output"
