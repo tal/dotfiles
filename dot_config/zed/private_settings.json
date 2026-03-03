@@ -9,9 +9,28 @@
 {
   "ui_font_size": 16,
   "buffer_font_size": 15,
+  "title_bar": {
+    "show_sign_in": false,
+  },
+  "show_edit_predictions": true,
+  "edit_predictions": {
+    "mode": "eager",
+    "provider": "ollama",
+    "ollama": {
+      // Default model maps to datadoginternal/Qwen/Qwen2.5-Coder-7B via our proxy.
+      // Other mapped names: qwen2.5-coder:3b, starcoder2:3b, codestral:latest, zeta
+      // Or pass AI Gateway model names directly, e.g. "datadoginternal/Qwen/Qwen2.5-Coder-3B"
+      "model": "qwen2.5-coder:7b",
+      "max_output_tokens": 128,
+      // Staging:
+      "api_url": "https://ai-devx-ide.us1.staging.dog/internal/ide/ollama",
+      // Prod: (not working yet)
+      // "api_url": "https://ai-devx-ide.us1.prod.dog/internal/ide/ollama",
+    },
+  },
   "theme": {
     "mode": "system",
     "light": "One Light",
-    "dark": "Neon"
-  }
+    "dark": "Neon",
+  },
 }
