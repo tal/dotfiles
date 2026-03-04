@@ -38,6 +38,7 @@ tmp/
 temp/
 claude-notifications.jsonl
 *.local.md
+.claude/worktrees/
 
 # Build artifacts
 dist/
