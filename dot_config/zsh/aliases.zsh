@@ -1,7 +1,7 @@
 # General aliases
 alias ll='lsd -la'
 alias la='lsd -A'
-alias l='lsd -F'
+alias l='lsdl --limit 3 -F'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'

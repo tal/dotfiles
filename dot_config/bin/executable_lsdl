@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+# lsdl - lsd wrapper with per-directory item limit
+#
+# Usage: lsdl --limit N [lsd options...]
+#   --limit N    Show at most N items per directory (requires --tree or -R)
+#
+# All other arguments are passed through to lsd.
+
+set -euo pipefail
+
+LIMIT=""
+LSD_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --limit)
+            if [[ $# -lt 2 ]]; then
+                echo "error: --limit requires a number" >&2
+                exit 1
+            fi
+            LIMIT="$2"
+            shift 2
+            ;;
+        --limit=*)
+            LIMIT="${1#--limit=}"
+            shift
+            ;;
+        *)
+            LSD_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# No limit — pass through directly
+if [[ -z "$LIMIT" ]]; then
+    exec /opt/homebrew/bin/lsd "${LSD_ARGS[@]}"
+fi
+
+if ! [[ "$LIMIT" =~ ^[0-9]+$ ]] || [[ "$LIMIT" -lt 1 ]]; then
+    echo "error: --limit must be a positive integer" >&2
+    exit 1
+fi
+
+# Always use tree-aware processing when limit is set
+# (lsd config may enable tree/recursive without explicit flags)
+# Force color and icons since we're piping through awk
+/opt/homebrew/bin/lsd --color always --icon always "${LSD_ARGS[@]}" | awk -v limit="$LIMIT" '
+    function get_depth(line,    clean, prefix, d, prev_len) {
+        # Strip ANSI escape codes for depth calculation
+        clean = line
+        gsub(/\033\[[0-9;]*m/, "", clean)
+
+        if (clean !~ /[├└│]/ && clean !~ /^    /) return 0
+
+        prefix = clean
+        sub(/[├└].*/, "", prefix)
+
+        d = 0
+        prev_len = -1
+        while (prefix != "") {
+            if (length(prefix) == prev_len) break
+            prev_len = length(prefix)
+            if (substr(prefix, 1, 1) == " ") {
+                sub(/^    /, "", prefix)
+                d++
+            } else {
+                sub(/^[^├└ ][^├└]*/, "", prefix)
+                d++
+            }
+        }
+        return d + 1
+    }
+
+    function make_prefix(depth,    i, p) {
+        p = ""
+        for (i = 1; i < depth; i++) {
+            if (parent_continues[i])
+                p = p "│   "
+            else
+                p = p "    "
+        }
+        return p
+    }
+
+    function flush_suppressed(up_to_depth,    d) {
+        for (d = max_depth; d >= up_to_depth; d--) {
+            if (suppressed[d] > 0) {
+                printf "%s  \033[2m... (%d more)\033[0m\n", make_prefix(d), suppressed[d]
+                suppressed[d] = 0
+            }
+        }
+    }
+
+    {
+        depth = get_depth($0)
+
+        # When moving to same or shallower depth, flush suppressed counts from deeper levels
+        if (depth <= prev_depth) {
+            flush_suppressed(depth + 1)
+        }
+
+        # Reset child counts for levels deeper than current
+        for (d = depth + 1; d <= max_depth; d++) {
+            count[d] = 0
+        }
+        if (depth > max_depth) max_depth = depth
+        prev_depth = depth
+
+        # Track whether this depth level has a continuing sibling
+        clean = $0
+        gsub(/\033\[[0-9;]*m/, "", clean)
+        if (clean ~ /├/) {
+            parent_continues[depth] = 1
+        } else if (clean ~ /└/) {
+            parent_continues[depth] = 0
+        }
+
+        count[depth]++
+
+        # Check if any ancestor is over its limit
+        ancestor_suppressed = 0
+        for (d = 2; d < depth; d++) {
+            if (count[d] > limit) {
+                ancestor_suppressed = 1
+                break
+            }
+        }
+
+        if (ancestor_suppressed) {
+            # Silently skip children of suppressed parents
+            next
+        }
+
+        # Depth 1 = direct children of listed directory, never limit those
+        if (depth <= 1 || count[depth] <= limit) {
+            print
+        } else {
+            suppressed[depth]++
+        }
+    }
+
+    END {
+        flush_suppressed(1)
+    }
+    '
