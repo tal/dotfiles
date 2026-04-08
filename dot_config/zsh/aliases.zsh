@@ -12,16 +12,14 @@ alias cyolo='claude --allow-dangerously-skip-permissions'
 # cc function with shorthand parameter support
 cc() {
   local args=()
-
-  # If no parameters, just call the base command
-  if [[ $# -eq 0 ]]; then
-    claude --allow-dangerously-skip-permissions
-    return
-  fi
+  local permission_flag='--allow-dangerously-skip-permissions'
 
   # Process parameters
   for arg in "$@"; do
     case "$arg" in
+      a)
+        permission_flag='--enable-auto-mode'
+        ;;
       c)
         args+=(--continue)
         ;;
@@ -34,5 +32,5 @@ cc() {
     esac
   done
 
-  claude --allow-dangerously-skip-permissions "${args[@]}"
+  claude "$permission_flag" "${args[@]}"
 }
