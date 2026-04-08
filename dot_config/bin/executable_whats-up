@@ -1,0 +1,1055 @@
+#!/usr/bin/env zsh
+# whats-up — quick system health overview with top resource hogs
+
+set -uo pipefail
+
+# ── Colors & formatting ──────────────────────────────────────────────
+bold=$'\033[1m'
+dim=$'\033[2m'
+red=$'\033[31m'
+yellow=$'\033[33m'
+green=$'\033[32m'
+cyan=$'\033[36m'
+reset=$'\033[0m'
+warn_marker=" ${yellow}⚠${reset}"
+
+# ── Globals ──────────────────────────────────────────────────────────
+cores=$(sysctl -n hw.ncpu)
+typeset -A anomalies
+typeset -a suggestions suggestion_commands suggestion_needs_sudo
+
+# ── Argument parsing ─────────────────────────────────────────────────
+cpu_min=0
+mem_min=0
+recent_mins=10
+mode='snapshot'        # 'snapshot' | 'watch'
+color_mode='on'        # 'on' | 'off'
+action_mode='interactive'  # 'interactive' | 'off'
+
+usage() {
+  cat <<'EOF'
+Usage: whats-up [OPTIONS]
+
+Options:
+  --cpu-min N     Only show processes using > N% CPU (default: 0)
+  --mem-min N     Only show processes using > N% memory (default: 0)
+  --watch         Run twice (5s apart) and show deltas
+  --recent N      Show processes spawned in last N minutes (default: 10)
+  --no-actions    Skip interactive suggestions
+  --no-color      Disable color output
+  --help          Show this help
+EOF
+}
+
+parse_arguments() {
+  local o_cpu_min o_mem_min o_watch o_recent o_no_actions o_no_color o_help
+
+  zparseopts -D -E -F -- \
+    -cpu-min:=o_cpu_min \
+    -mem-min:=o_mem_min \
+    -watch=o_watch \
+    -recent:=o_recent \
+    -no-actions=o_no_actions \
+    -no-color=o_no_color \
+    -help=o_help 2>/dev/null || { usage; exit 1; }
+
+  [[ -n "${o_help[1]:-}" ]] && { usage; exit 0; }
+  [[ -n "${o_cpu_min[1]:-}" ]] && cpu_min=${o_cpu_min[2]}
+  [[ -n "${o_mem_min[1]:-}" ]] && mem_min=${o_mem_min[2]}
+  [[ -n "${o_watch[1]:-}" ]] && mode='watch'
+  [[ -n "${o_recent[1]:-}" ]] && recent_mins=${o_recent[2]}
+  [[ -n "${o_no_actions[1]:-}" ]] && action_mode='off'
+  [[ -n "${o_no_color[1]:-}" ]] && color_mode='off'
+
+  if [[ "$color_mode" == 'off' ]]; then
+    bold="" dim="" red="" yellow="" green="" cyan="" reset=""
+    warn_marker=" ⚠"
+  fi
+}
+
+# ── Gather system overview ───────────────────────────────────────────
+read_top_summary() {
+  top_output=$(top -l 1 -n 1 -stats pid,command,cpu 2>/dev/null)
+
+  load_avg_raw=$(echo "$top_output" | grep "Load Avg" | sed 's/.*Load Avg: //')
+  load_1=$(echo "$load_avg_raw" | cut -d',' -f1 | tr -d ' ')
+  load_5=$(echo "$load_avg_raw" | cut -d',' -f2 | tr -d ' ')
+  load_15=$(echo "$load_avg_raw" | cut -d',' -f3 | tr -d ' ')
+  cpu_line=$(echo "$top_output" | grep "CPU usage")
+  cpu_user=$(echo "$cpu_line" | sed 's/.*: \([0-9.]*\)% user.*/\1/')
+  cpu_sys=$(echo "$cpu_line" | sed 's/.*user, \([0-9.]*\)% sys.*/\1/')
+  cpu_idle=$(echo "$cpu_line" | sed 's/.*sys, \([0-9.]*\)% idle.*/\1/')
+
+  phys_mem=$(echo "$top_output" | grep "PhysMem")
+  mem_used=$(echo "$phys_mem" | sed 's/.*PhysMem: \([0-9A-Za-z]*\) used.*/\1/')
+  mem_unused=$(echo "$phys_mem" | sed 's/.*, \([0-9A-Za-z]*\) unused.*/\1/')
+
+  proc_line=$(echo "$top_output" | grep "Processes:")
+  total_procs=$(echo "$proc_line" | sed 's/.*Processes: \([0-9]*\) total.*/\1/')
+  running_procs=$(echo "$proc_line" | sed 's/.*, \([0-9]*\) running.*/\1/')
+
+  swap_line=$(echo "$top_output" | grep "VM:")
+  # Format: "9020767(0) swapins, 10742587(0) swapouts."
+  swapins=$(echo "$swap_line" | sed 's/.*vsize, \([0-9]*\)(.*/\1/')
+  swapouts=$(echo "$swap_line" | sed 's/.*swapins, \([0-9]*\)(.*/\1/')
+
+  total_ram_bytes=$(sysctl -n hw.memsize)
+  total_ram_gb=$(echo "scale=0; $total_ram_bytes / 1073741824" | bc)
+
+  pressure=$(memory_pressure 2>/dev/null | tail -1 | sed 's/.*: //' || echo "unknown")
+}
+
+# ── Gather aggregated per-process data ───────────────────────────────
+# Walks each process up to its root ancestor (parent of PID 0 or 1),
+# then sums CPU, MEM, and RSS under that ancestor.
+# Output: TAB-separated lines: PID \t CPU \t MEM \t RSS \t COUNT \t BASENAME \t FULL_ARGS
+get_aggregated_processes() {
+  ps -Ao pid=,ppid=,pcpu=,pmem=,rss=,args= | awk '
+  {
+    pid = $1; ppid = $2; cpu = $3; mem = $4; rss = $5
+    args = ""; for (i = 6; i <= NF; i++) args = (args == "" ? $i : args " " $i)
+
+    # Extract basename from the binary (first word of args)
+    bn = $6; sub(/.*\//, "", bn)
+
+    par[pid] = ppid; cpu_v[pid] = cpu+0; mem_v[pid] = mem+0; rss_v[pid] = rss+0
+    base[pid] = bn; full[pid] = args
+
+    # Detect transparent processes (terminal emulators, tmux, shells)
+    if (bn ~ /^(ghostty|iTerm2|Terminal|Alacritty|kitty|WezTerm|tmux|tmux-client|login|sshd|bash|zsh|sh|fish)$/) {
+      transparent[pid] = 1
+    }
+  }
+  END {
+    for (pid in par) {
+      a = pid; n = 0
+      while ((a in par) && par[a]+0 > 1 && n < 20) {
+        if (par[a] in transparent) break
+        a = par[a]; n++
+      }
+      agg_cpu[a] += cpu_v[pid]
+      agg_mem[a] += mem_v[pid]
+      agg_rss[a] += rss_v[pid]
+      agg_cnt[a]++
+    }
+    for (a in agg_cpu) {
+      if (agg_cpu[a] > 0.1 || agg_rss[a] > 10240) {
+        printf "%s\t%.1f\t%.1f\t%d\t%d\t%s\t%s\n", a, agg_cpu[a], agg_mem[a], agg_rss[a], agg_cnt[a], base[a], full[a]
+      }
+    }
+  }'
+}
+
+# ── Helpers ──────────────────────────────────────────────────────────
+human_bytes() {
+  local kb=$1
+  if [ "$kb" -ge 1048576 ]; then
+    echo "$(echo "scale=1; $kb / 1048576" | bc)G"
+  elif [ "$kb" -ge 1024 ]; then
+    echo "$(echo "scale=0; $kb / 1024" | bc)M"
+  else
+    echo "${kb}K"
+  fi
+}
+
+human_number() {
+  local n=$1
+  if [ "$n" -ge 1000000 ]; then
+    echo "$(echo "scale=1; $n / 1000000" | bc)M"
+  elif [ "$n" -ge 1000 ]; then
+    echo "$(echo "scale=1; $n / 1000" | bc)K"
+  else
+    echo "$n"
+  fi
+}
+
+short_name() {
+  basename "$1" 2>/dev/null || echo "$1"
+}
+
+# ── Process descriptions for obscure macOS daemons ───────────────────
+typeset -A process_desc=(
+  # Spotlight & search
+  [corespotlightd]="Spotlight indexing"
+  [managedcorespotlightd]="Managed Spotlight indexing"
+  [mds]="Metadata server (Spotlight)"
+  [mds_stores]="Spotlight metadata store"
+  [mdworker_shared]="Spotlight indexing worker"
+  [searchpartyd]="Find My network"
+
+  # Contacts, calendar, messages
+  [contactsd]="Contacts database"
+  [CalendarAgent]="Calendar sync"
+  [IMDPersistenceAgent]="iMessage database"
+  [imagent]="iMessage/FaceTime agent"
+  [identityservicesd]="Apple ID & iMessage auth"
+
+  # Photos
+  [photolibraryd]="Photos library management"
+  [photoanalysisd]="Photos face/scene analysis"
+
+  # iCloud & sync
+  [cloudd]="CloudKit sync"
+  [bird]="iCloud Drive sync"
+  [nsurlsessiond]="Background URL downloads"
+  [fileproviderd]="iCloud Drive file provider"
+  [itunescloudd]="iTunes/Music cloud sync"
+
+  # Scheduling & lifecycle
+  [dasd]="Duet Activity Scheduler"
+  [duetexpertd]="Predictive app suggestions"
+  [runningboardd]="Process lifecycle manager"
+  [chronod]="Background task scheduling"
+  [progressd]="System progress tracking"
+
+  # System core
+  [WindowServer]="Display compositor"
+  [WindowManager]="Window management (Stage Manager)"
+  [coreaudiod]="Core audio daemon"
+  [logd]="System logging daemon"
+  [logd_helper]="System log helper"
+  [launchservicesd]="App launch services"
+  [cfprefsd]="Preferences daemon"
+  [distnoted]="Distributed notifications"
+  [notifyd]="Notification daemon"
+  [NotificationCenter]="Notification Center UI"
+  [usermanagerd]="User session management"
+  [containermanagerd]="App sandbox containers"
+  [syspolicyd]="Gatekeeper / system policy"
+  [trustd]="Certificate trust evaluation"
+  [kernelmanagerd]="Kernel extension manager"
+  [PerfPowerServices]="Performance/power management"
+  [symptomsd]="Network diagnostics"
+  [sysmond]="System resource monitor"
+  [thermalmonitord]="Thermal management"
+
+  # Networking
+  [bluetoothd]="Bluetooth daemon"
+  [wifid]="WiFi daemon"
+  [rapportd]="Device proximity & Handoff"
+  [sharingd]="AirDrop & sharing"
+  [CommCenter]="Cellular/network stack"
+  [mDNSResponder]="Bonjour/DNS resolver"
+  [configd]="Network configuration"
+
+  # Software updates & assets
+  [mobileassetd]="Software update assets"
+  [softwareupdated]="Software Update daemon"
+  [nsurlstoraged]="URL cache storage"
+
+  # Siri & assistant
+  [siriknowledged]="Siri knowledge"
+  [corespeechd]="Speech recognition"
+  [assistantd]="Siri daemon"
+  [parsec-fbf]="Siri/Spotlight suggestions"
+  [parsecd]="Siri/Spotlight suggestions"
+
+  # Energy & home
+  [homeenergyd]="Home energy tracking"
+  [homed]="HomeKit daemon"
+
+  # Media
+  [avconferenced]="FaceTime/video conferencing"
+  [VTDecoderXPCService]="Video decoding"
+  [VTEncoderXPCService]="Video encoding"
+  [mediaremoted]="Media remote control"
+  [mediaanalysisd]="Media analysis"
+  [mediaaccessibilityd]="Media accessibility"
+
+  # Security
+  [secinitd]="App sandbox init"
+  [securityd]="Security framework daemon"
+  [opendirectoryd]="Directory services (auth)"
+  [authd]="Authorization daemon"
+
+  # Developer tools
+  [SWBBuildService]="Xcode Swift Build service"
+  [sourcekit-lsp]="Swift language server"
+  [launchd_sim]="iOS Simulator launcher"
+  [CoreSimulator]="iOS Simulator framework"
+  [com.apple.CoreSimulator.CoreSimulatorService]="Simulator service"
+
+  # Misc
+  [tipsd]="Tips app suggestions"
+  [touristd]="macOS feature tours"
+  [triald]="A/B feature flags"
+  [biabortagent]="Background Intel. agent"
+  [biomesyncd]="Biome (activity) sync"
+  [contextstored]="App context store"
+  [lsd]="Launch Services database"
+  [tccd]="Privacy permissions (TCC)"
+  [gamecontrollerd]="Game controller daemon"
+  [iconservicesagent]="App icon cache"
+  [replayd]="Screen recording daemon"
+  [coreduetd]="Device usage tracking"
+  [AMPDevicesAgent]="Apple Music devices"
+  [AMPLibraryAgent]="Apple Music library"
+  [BTLEServerAgent]="Bluetooth LE server"
+  [com.apple.DriverKit-AppleBCMWLAN]="WiFi driver"
+  [aneuserd]="Neural Engine daemon"
+)
+
+# System-critical processes that should never be offered for killing
+typeset -A system_critical=(
+  [kernel_task]=1 [launchd]=1 [WindowServer]=1 [loginwindow]=1
+  [opendirectoryd]=1 [securityd]=1 [trustd]=1 [authd]=1
+  [coreaudiod]=1 [logd]=1 [notifyd]=1 [distnoted]=1 [cfprefsd]=1
+  [runningboardd]=1 [usermanagerd]=1 [syspolicyd]=1 [configd]=1
+  [mDNSResponder]=1 [bluetoothd]=1 [wifid]=1 [PerfPowerServices]=1
+  [thermalmonitord]=1 [sysmond]=1 [kernelmanagerd]=1
+)
+
+describe_process() {
+  local name=$1
+  if (( ${+process_desc[$name]} )); then
+    echo "${process_desc[$name]}"
+  fi
+}
+
+# ── Identify what ambiguous processes are doing from args ────────────
+identify_from_args() {
+  local basename=$1
+  local args=$2
+  local hint=""
+
+  case "$basename" in
+    node|nodejs)
+      # Strip the binary itself, then find what's being run
+      hint=${args#*node }
+      # node_modules/.bin/something → something
+      if [[ "$hint" == *node_modules/.bin/* ]]; then
+        hint=${hint##*node_modules/.bin/}
+        hint=${hint%% *}
+      # /path/to/script.js args... → script.js
+      elif [[ "$hint" == /* || "$hint" == ./* ]]; then
+        hint=${hint%% *}
+        hint=${hint##*/}
+      # module-name args... → module-name
+      else
+        hint=${hint%% *}
+        hint=${hint##*/}
+      fi
+      ;;
+    python|python3|python3.*)
+      hint=${args#*python* }
+      # python -m module → module
+      if [[ "$hint" == -m\ * ]]; then
+        hint=${hint#-m }
+        hint=${hint%% *}
+      # python /path/to/script.py → script.py
+      elif [[ "$hint" == /* || "$hint" == ./* ]]; then
+        hint=${hint%% *}
+        hint=${hint##*/}
+      else
+        hint=${hint%% *}
+        hint=${hint##*/}
+      fi
+      ;;
+    ruby)
+      hint=${args#*ruby }
+      hint=${hint%% *}
+      hint=${hint##*/}
+      ;;
+    java)
+      # java -jar foo.jar → foo.jar
+      if [[ "$args" == *-jar\ * ]]; then
+        hint=${args#*-jar }
+        hint=${hint%% *}
+        hint=${hint##*/}
+      # java -cp ... com.foo.Main → Main
+      elif [[ "$args" == *-cp\ * || "$args" == *-classpath\ * ]]; then
+        # Last argument is typically the main class
+        hint=${args##* }
+        hint=${hint##*.}
+      fi
+      ;;
+    perl)
+      hint=${args#*perl }
+      hint=${hint%% *}
+      hint=${hint##*/}
+      ;;
+    deno)
+      hint=${args#*deno }
+      hint=${hint%% *}
+      [[ "$hint" == run ]] && { hint=${args#*run }; hint=${hint%% *}; hint=${hint##*/}; }
+      ;;
+    bun)
+      hint=${args#*bun }
+      hint=${hint%% *}
+      hint=${hint##*/}
+      ;;
+    claude)
+      # Claude CLI — try to identify the working directory or mode
+      if [[ "$args" == *" --dangerously-skip-permissions"* ]]; then
+        hint="headless"
+      fi
+      ;;
+    clang|clang++|swift-frontend)
+      # Try to find the source file being compiled
+      local src=""
+      for word in ${(z)args}; do
+        case "$word" in
+          *.swift|*.c|*.cpp|*.m|*.mm)
+            src=${word##*/}
+            break
+            ;;
+        esac
+      done
+      [[ -n "$src" ]] && hint="compiling $src"
+      ;;
+    xcodebuild|SWBBuildService)
+      hint="Xcode build"
+      ;;
+  esac
+
+  # Clean up: remove flags, empty results
+  [[ "$hint" == -* ]] && hint=""
+  [[ "$hint" == "$basename" ]] && hint=""
+
+  echo "$hint"
+}
+
+color_for_cpu() {
+  local cpu=$1
+  local int_cpu=${cpu%.*}
+  if [ "${int_cpu:-0}" -ge 50 ]; then
+    echo "$red"
+  elif [ "${int_cpu:-0}" -ge 20 ]; then
+    echo "$yellow"
+  else
+    echo "$reset"
+  fi
+}
+
+color_for_load() {
+  local load=$1
+  local ratio
+  ratio=$(echo "$load / $cores" | bc 2>/dev/null || echo "0")
+  if [ "${ratio:-0}" -ge 3 ]; then
+    echo "$red"
+  elif [ "${ratio:-0}" -ge 1 ]; then
+    echo "$yellow"
+  else
+    echo "$green"
+  fi
+}
+
+color_for_disk() {
+  local pct=$1
+  if [ "${pct:-0}" -ge 90 ]; then
+    echo "$red"
+  elif [ "${pct:-0}" -ge 80 ]; then
+    echo "$yellow"
+  else
+    echo "$green"
+  fi
+}
+
+# ── Spotlight status ─────────────────────────────────────────────────
+get_spotlight_status() {
+  local mdutil_out
+  mdutil_out=$(mdutil -s / 2>/dev/null | tail -1 | sed 's/^[[:space:]]*//')
+  if [[ "$mdutil_out" == *"Indexing and calculation"* ]]; then
+    spotlight_status='indexing'
+  elif [[ "$mdutil_out" == *"Indexing enabled"* ]]; then
+    spotlight_status='enabled'
+  elif [[ "$mdutil_out" == *"Indexing disabled"* ]]; then
+    spotlight_status='disabled'
+  else
+    spotlight_status='unknown'
+  fi
+}
+
+# ── Disk usage ───────────────────────────────────────────────────────
+print_disk_row() {
+  local line=$1
+  local pct
+  pct=$(echo "$line" | grep -o '[0-9]*%' | tr -d '%')
+  local dcolor
+  dcolor=$(color_for_disk "${pct:-0}")
+  local marker=""
+  (( ${pct:-0} >= 90 )) && marker="$warn_marker"
+  printf "${dcolor}%s${reset}%s\n" "$line" "$marker"
+}
+
+print_disk_usage() {
+  printf "\n${bold}${cyan}━━━ Disk Usage ━━━${reset}\n\n"
+
+  # Primary volumes
+  local disk_lines
+  disk_lines=$(df -h / /System/Volumes/Data 2>/dev/null | awk 'NR>1 && !seen[$1]++ {
+    printf "  %-25s %6s / %-6s  (%s)\n", $9, $3, $2, $5
+  }')
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    print_disk_row "$line"
+  done <<< "$disk_lines"
+
+  # Additional mounted volumes (external drives, etc.)
+  local extra_lines
+  extra_lines=$(df -h 2>/dev/null | awk 'NR>1 && $1 !~ /^(devfs|map|\/dev\/disk[0-9]+s[0-9]+$)/ && $9 !~ /^\/(System|private|dev)/ && $9 != "/" {
+    printf "  %-25s %6s / %-6s  (%s)\n", $9, $3, $2, $5
+  }')
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    print_disk_row "$line"
+  done <<< "$extra_lines"
+}
+
+# ── Anomaly detection ────────────────────────────────────────────────
+check_anomalies() {
+  # Memory pressure not normal
+  if [[ "$pressure" != *"normal"* && "$pressure" != "unknown" ]]; then
+    anomalies[pressure]="Memory pressure: $pressure"
+  fi
+
+  # Load:core ratio > 2
+  local load_ratio load_ratio_int
+  load_ratio=$(echo "scale=1; $load_1 / $cores" | bc 2>/dev/null || echo "0")
+  load_ratio_int=$(printf "%.0f" "$load_ratio" 2>/dev/null || echo "0")
+  if (( ${load_ratio_int:-0} >= 2 )); then
+    anomalies[load]="Load ${load_1} is ${load_ratio}x over ${cores} cores"
+  fi
+
+  # High swap activity
+  if (( ${swapouts:-0} > 100000 )); then
+    anomalies[swap]="High swap activity: $(human_number ${swapouts}) swapouts"
+  fi
+
+  # Boot disk > 90%
+  local boot_pct
+  boot_pct=$(df / 2>/dev/null | awk 'NR==2{print $5+0}')
+  if (( ${boot_pct:-0} > 90 )); then
+    anomalies[disk]="Boot disk ${boot_pct}% full"
+  fi
+
+  # Spotlight actively indexing
+  if [[ "$spotlight_status" == 'indexing' ]]; then
+    anomalies[spotlight]="Spotlight is actively indexing"
+  fi
+}
+
+check_process_anomalies() {
+  local agg_data=$1
+  while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+    [[ -z "$pid" ]] && continue
+    local int_cpu=${cpu%.*}
+    if (( ${int_cpu:-0} > 100 )); then
+      anomalies[proc_${pid}]="${basename} (PID $pid) using ${cpu}% CPU"
+    fi
+  done <<< "$agg_data"
+}
+
+print_anomaly_summary() {
+  if (( ${#anomalies} > 0 )); then
+    printf "\n${bold}${yellow}━━━ ⚠ Anomalies ━━━${reset}\n\n"
+    for key in ${(k)anomalies}; do
+      printf "  ${yellow}⚠${reset} %s\n" "${anomalies[$key]}"
+    done
+  fi
+}
+
+# ── Recently spawned processes ───────────────────────────────────────
+print_recent_processes() {
+  local recent_mins=$1
+  local recent_data
+  recent_data=$(ps -eo etime=,pid=,pcpu=,rss=,comm= 2>/dev/null | awk -v max_mins="$recent_mins" '
+  {
+    etime = $1; pid = $2; cpu = $3; rss = $4
+    comm = ""; for (i = 5; i <= NF; i++) comm = (comm == "" ? $i : comm " " $i)
+    bn = comm; sub(/.*\//, "", bn)
+
+    # Skip kernel and system bootstrap
+    if (bn == "kernel_task" || bn == "launchd") next
+
+    # Parse etime: formats are MM:SS, HH:MM:SS, D-HH:MM:SS
+    total_mins = 0
+    if (etime ~ /^[0-9]+-/) {
+      # D-HH:MM:SS
+      split(etime, parts, "-")
+      days = parts[1]+0
+      split(parts[2], hms, ":")
+      total_mins = days * 1440 + hms[1] * 60 + hms[2]
+    } else {
+      n = split(etime, hms, ":")
+      if (n == 3) {
+        total_mins = hms[1] * 60 + hms[2]
+      } else if (n == 2) {
+        total_mins = hms[1]+0
+      }
+    }
+
+    if (total_mins < max_mins) {
+      printf "%s\t%s\t%s\t%d\t%s\n", etime, pid, cpu, rss, bn
+    }
+  }' | sort -t$'\t' -k1 -n)
+
+  # Only print section if there are results
+  local line_count
+  line_count=$(echo "$recent_data" | grep -c '[^[:space:]]' 2>/dev/null || echo "0")
+  if (( line_count > 0 )); then
+    printf "\n${bold}${cyan}━━━ Recently Spawned (last %s min) ━━━${reset}\n\n" "$recent_mins"
+    printf "  ${dim}%-10s %-7s %6s %8s  %-24s${reset}\n" "AGE" "PID" "CPU%" "RAM" "PROCESS"
+    printf "  ${dim}%-10s %-7s %6s %8s  %-24s${reset}\n" "──────────" "───────" "──────" "────────" "────────────────────────"
+    local trimmed desc color
+    trimmed=$(echo "$recent_data" | head -15)
+    while IFS=$'\t' read -r etime pid cpu rss name; do
+      [[ -z "$pid" ]] && continue
+      desc=$(describe_process "$name")
+      color=$(color_for_cpu "$cpu")
+      if [[ -n "$desc" ]]; then
+        printf "  %-10s %-7s ${color}%6s${reset} %8s  %-24s  ${dim}%s${reset}\n" "$etime" "$pid" "$cpu" "$(human_bytes "$rss")" "$name" "$desc"
+      else
+        printf "  %-10s %-7s ${color}%6s${reset} %8s  %-24s\n" "$etime" "$pid" "$cpu" "$(human_bytes "$rss")" "$name"
+      fi
+    done <<< "$trimmed"
+  fi
+}
+
+# ── Print report ─────────────────────────────────────────────────────
+print_header() {
+  printf "\n${bold}${cyan}━━━ System Health ━━━${reset}\n\n"
+}
+
+print_overview() {
+  local load_color
+  load_color=$(color_for_load "$load_1")
+
+  local ratio
+  ratio=$(echo "scale=0; $load_1 / $cores" | bc 2>/dev/null || echo "0")
+  local load_label
+  if [ "${ratio:-0}" -ge 10 ]; then
+    load_label="extreme"
+  elif [ "${ratio:-0}" -ge 5 ]; then
+    load_label="critical"
+  elif [ "${ratio:-0}" -ge 3 ]; then
+    load_label="heavy"
+  elif [ "${ratio:-0}" -ge 1 ]; then
+    load_label="moderate"
+  else
+    load_label="light"
+  fi
+
+  # Anomaly markers for overview lines
+  local load_warn="" pressure_warn="" swap_warn="" spotlight_warn=""
+  (( ${+anomalies[load]} )) && load_warn="$warn_marker"
+  (( ${+anomalies[pressure]} )) && pressure_warn="$warn_marker"
+  (( ${+anomalies[swap]} )) && swap_warn="$warn_marker"
+  (( ${+anomalies[spotlight]} )) && spotlight_warn="$warn_marker"
+
+  printf "  ${bold}Load Avg:${reset}    ${load_color}%s ${dim}1m${reset}  ${load_color}%s ${dim}5m${reset}  ${load_color}%s ${dim}15m${reset}  ${dim}(%s — %sx over %s cores)${reset}%s\n" "$load_1" "$load_5" "$load_15" "$load_label" "$ratio" "$cores" "$load_warn"
+  printf "  ${bold}CPU:${reset}         %.0f%% user, %.0f%% sys, ${bold}%.0f%% idle${reset}\n" "$cpu_user" "$cpu_sys" "$cpu_idle"
+  printf "  ${bold}Memory:${reset}      %s used / %sG total (%s free)\n" "$mem_used" "$total_ram_gb" "$mem_unused"
+  printf "  ${bold}Pressure:${reset}    %s%s\n" "$pressure" "$pressure_warn"
+  printf "  ${bold}Processes:${reset}   %s total, %s running\n" "$total_procs" "$running_procs"
+  printf "  ${bold}Swap:${reset}        %s swapins, %s swapouts%s\n" "$(human_number "${swapins:-0}")" "$(human_number "${swapouts:-0}")" "$swap_warn"
+
+  # Spotlight status
+  local spotlight_color="$green"
+  local spotlight_label=""
+  case "$spotlight_status" in
+    indexing)  spotlight_color="$yellow"; spotlight_label="Actively indexing" ;;
+    enabled)   spotlight_label="Enabled (idle)" ;;
+    disabled)  spotlight_color="$dim"; spotlight_label="Disabled" ;;
+    *)         spotlight_label="Unknown" ;;
+  esac
+  printf "  ${bold}Spotlight:${reset}   ${spotlight_color}%s${reset}%s\n" "$spotlight_label" "$spotlight_warn"
+}
+
+print_table_header() {
+  printf "\n${bold}${cyan}━━━ %s ━━━${reset}\n\n" "$1"
+  printf "  ${dim}%-7s %-32s %6s %6s %8s${reset}\n" "PID" "PROCESS" "CPU%" "MEM%" "RAM"
+  printf "  ${dim}%-7s %-32s %6s %6s %8s${reset}\n" "───────" "────────────────────────────────" "──────" "──────" "────────"
+}
+
+print_agg_row() {
+  # Args: PID CPU MEM RSS COUNT BASENAME [FULL_ARGS...] [-- ANNOTATION]
+  local pid=$1 cpu=$2 mem=$3 rss=$4 count=$5 name=$6
+  shift 6
+
+  # Split full_args from annotation (separated by --)
+  local full_args="" annotation=""
+  local found_sep='no'
+  for arg in "$@"; do
+    if [[ "$arg" == "--" ]]; then
+      found_sep='yes'
+      continue
+    fi
+    if [[ "$found_sep" == 'yes' ]]; then
+      annotation="$arg"
+    else
+      full_args="${full_args:+$full_args }$arg"
+    fi
+  done
+
+  local color
+  color=$(color_for_cpu "$cpu")
+
+  # Build description: prefer daemon descriptions, then try args identification
+  local desc
+  desc=$(describe_process "$name")
+  if [[ -z "$desc" ]]; then
+    desc=$(identify_from_args "$name" "$full_args")
+  fi
+
+  # Append annotation if present
+  if [[ -n "$annotation" ]]; then
+    desc="${desc:+$desc  }$annotation"
+  fi
+
+  # Anomaly marker for high CPU processes
+  local proc_warn=""
+  local int_cpu=${cpu%.*}
+  (( ${int_cpu:-0} > 100 )) && proc_warn="$warn_marker"
+
+  # Append process count if more than 1
+  if [[ "$count" -gt 1 ]]; then
+    name="${name} (${count} procs)"
+  fi
+
+  # Truncate long names
+  if [[ ${#name} -gt 32 ]]; then
+    name="${name:0:29}..."
+  fi
+
+  if [[ -n "$desc" ]]; then
+    printf "  %-7s ${color}%-32s %6s${reset} %6s %8s  ${dim}%s${reset}%s\n" "$pid" "$name" "$cpu" "$mem" "$(human_bytes "$rss")" "$desc" "$proc_warn"
+  else
+    printf "  %-7s ${color}%-32s %6s${reset} %6s %8s%s\n" "$pid" "$name" "$cpu" "$mem" "$(human_bytes "$rss")" "$proc_warn"
+  fi
+}
+
+# ── Actionable suggestions ───────────────────────────────────────────
+build_suggestions() {
+  local agg_data=$1
+  suggestions=()
+  suggestion_commands=()
+  suggestion_needs_sudo=()
+
+  local sorted_by_cpu
+  sorted_by_cpu=$(echo "$agg_data" | sort -t$'\t' -k2 -rn)
+
+  # Rule 1: Runaway processes (>100% CPU, not system-critical)
+  while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+    [[ -z "$pid" ]] && continue
+    (( ${+system_critical[$basename]} )) && continue
+    local int_cpu=${cpu%.*}
+    if (( ${int_cpu:-0} > 100 )); then
+      local desc
+      desc=$(describe_process "$basename")
+      [[ -z "$desc" ]] && desc=$(identify_from_args "$basename" "$full_args")
+      suggestions+=("Kill \"${basename}\" (PID ${pid}, ${cpu}% CPU${desc:+ — $desc})")
+      suggestion_commands+=("kill $pid")
+      suggestion_needs_sudo+=('no')
+    fi
+  done <<< "$sorted_by_cpu"
+
+  # Rule 2: Spotlight actively indexing
+  if [[ "$spotlight_status" == 'indexing' ]]; then
+    suggestions+=("Pause Spotlight indexing (re-enable with: sudo mdutil -a -i on)")
+    suggestion_commands+=("mdutil -a -i off")
+    suggestion_needs_sudo+=('yes')
+  fi
+
+  # Rule 3: Memory pressure not normal — offer to kill top memory consumer
+  if [[ "$pressure" != *"normal"* && "$pressure" != "unknown" ]]; then
+    local top_mem_pid top_mem_name top_mem_rss top_mem_basename top_mem_args
+    read -r top_mem_pid _ _ top_mem_rss _ top_mem_basename top_mem_args <<< \
+      "$(echo "$agg_data" | sort -t$'\t' -k4 -rn | head -1 | tr '\t' ' ')"
+    if [[ -n "$top_mem_pid" ]] && ! (( ${+system_critical[$top_mem_basename]} )); then
+      local desc
+      desc=$(describe_process "$top_mem_basename")
+      [[ -z "$desc" ]] && desc=$(identify_from_args "$top_mem_basename" "$top_mem_args")
+      suggestions+=("Kill top memory consumer \"${top_mem_basename}\" (PID ${top_mem_pid}, $(human_bytes "$top_mem_rss")${desc:+ — $desc})")
+      suggestion_commands+=("kill $top_mem_pid")
+      suggestion_needs_sudo+=('no')
+    fi
+  fi
+
+  # Rule 4: High CPU processes (>50%, not system-critical, not already caught by rule 1)
+  while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+    [[ -z "$pid" ]] && continue
+    (( ${+system_critical[$basename]} )) && continue
+    local int_cpu=${cpu%.*}
+    # Only 50-100% range (>100% already handled by rule 1)
+    if (( ${int_cpu:-0} > 50 && ${int_cpu:-0} <= 100 )); then
+      local desc
+      desc=$(describe_process "$basename")
+      [[ -z "$desc" ]] && desc=$(identify_from_args "$basename" "$full_args")
+      suggestions+=("Kill \"${basename}\" (PID ${pid}, ${cpu}% CPU${desc:+ — $desc})")
+      suggestion_commands+=("kill $pid")
+      suggestion_needs_sudo+=('no')
+    fi
+  done <<< "$sorted_by_cpu"
+}
+
+print_suggestions() {
+  printf "\n${bold}${cyan}━━━ Suggested Actions ━━━${reset}\n\n"
+
+  if (( ${#suggestions} == 0 )); then
+    printf "  ${green}System looks healthy — no actions suggested.${reset}\n"
+    return
+  fi
+
+  for i in {1..${#suggestions}}; do
+    printf "  ${bold}[%d]${reset} %s\n" "$i" "${suggestions[$i]}"
+  done
+
+  printf "\n  Press number to execute, or Enter to skip: "
+  if ! read -r choice </dev/tty 2>/dev/null; then
+    return
+  fi
+  [[ -z "$choice" ]] && return
+
+  # Validate input
+  if [[ ! "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#suggestions} )); then
+    printf "  ${dim}Invalid choice, skipping.${reset}\n"
+    return
+  fi
+
+  local cmd="${suggestion_commands[$choice]}"
+  local needs_sudo="${suggestion_needs_sudo[$choice]}"
+
+  local rc=0
+  if [[ "$needs_sudo" == 'yes' ]]; then
+    printf "  ${yellow}Running: sudo %s${reset}\n" "$cmd"
+    sudo eval "$cmd" || rc=$?
+  else
+    printf "  Running: %s\n" "$cmd"
+    eval "$cmd" || rc=$?
+  fi
+
+  if (( rc == 0 )); then
+    printf "  ${green}Done.${reset}\n"
+  else
+    printf "  ${red}Command failed (exit %d).${reset}\n" "$rc"
+  fi
+}
+
+# ── Watch/delta mode ─────────────────────────────────────────────────
+collect_snapshot() {
+  local prefix=$1
+  read_top_summary
+  eval "${prefix}_load_1=\$load_1"
+  eval "${prefix}_load_5=\$load_5"
+  eval "${prefix}_load_15=\$load_15"
+  eval "${prefix}_cpu_user=\$cpu_user"
+  eval "${prefix}_cpu_sys=\$cpu_sys"
+  eval "${prefix}_cpu_idle=\$cpu_idle"
+  eval "${prefix}_mem_used=\$mem_used"
+  eval "${prefix}_mem_unused=\$mem_unused"
+  eval "${prefix}_pressure=\$pressure"
+  eval "${prefix}_total_procs=\$total_procs"
+  eval "${prefix}_running_procs=\$running_procs"
+  eval "${prefix}_agg_data=\$(get_aggregated_processes)"
+}
+
+format_delta() {
+  local old=$1 new=$2 unit=${3:-""}
+  local diff
+  diff=$(echo "scale=1; $new - $old" | bc 2>/dev/null || echo "0")
+  local sign=""
+  # Check if diff is positive (not starting with -)
+  if [[ "$diff" != -* && "$diff" != "0" && "$diff" != "0.0" ]]; then
+    sign="+"
+  fi
+  local color="$reset"
+  if [[ "$diff" == -* ]]; then
+    color="$green"  # decreasing load is good
+  elif [[ "$diff" != "0" && "$diff" != "0.0" ]]; then
+    color="$red"    # increasing load is bad
+  fi
+  printf "%s → %s  ${color}(%s%s%s)${reset}" "$old" "$new" "$sign" "$diff" "$unit"
+}
+
+print_delta() {
+  print_header
+
+  printf "  ${bold}Load Avg 1m:${reset}  "
+  format_delta "$s1_load_1" "$s2_load_1"
+  # Anomaly on delta
+  local new_ratio new_ratio_int
+  new_ratio=$(echo "scale=1; $s2_load_1 / $cores" | bc 2>/dev/null || echo "0")
+  new_ratio_int=$(printf "%.0f" "$new_ratio" 2>/dev/null || echo "0")
+  (( ${new_ratio_int:-0} >= 2 )) && printf "%s" "$warn_marker"
+  printf "\n"
+
+  printf "  ${bold}Load Avg 5m:${reset}  "
+  format_delta "$s1_load_5" "$s2_load_5"
+  printf "\n"
+
+  printf "  ${bold}CPU idle:${reset}     "
+  # For CPU idle, decreasing is bad
+  local idle_diff
+  idle_diff=$(echo "scale=1; $s2_cpu_idle - $s1_cpu_idle" | bc 2>/dev/null || echo "0")
+  local idle_color="$reset"
+  if [[ "$idle_diff" == -* ]]; then
+    idle_color="$red"
+  elif [[ "$idle_diff" != "0" && "$idle_diff" != "0.0" ]]; then
+    idle_color="$green"
+  fi
+  local idle_sign=""
+  [[ "$idle_diff" != -* && "$idle_diff" != "0" && "$idle_diff" != "0.0" ]] && idle_sign="+"
+  printf "%.0f%% → %.0f%%  ${idle_color}(%s%s%%)${reset}\n" "$s1_cpu_idle" "$s2_cpu_idle" "$idle_sign" "$idle_diff"
+
+  printf "  ${bold}Memory:${reset}       %s → %s\n" "$s1_mem_used" "$s2_mem_used"
+  printf "  ${bold}Pressure:${reset}     %s → %s" "$s1_pressure" "$s2_pressure"
+  [[ "$s2_pressure" != *"normal"* && "$s2_pressure" != "unknown" ]] && printf "%s" "$warn_marker"
+  printf "\n"
+  printf "  ${bold}Processes:${reset}    %s → %s\n" "$s1_total_procs" "$s2_total_procs"
+
+  # Process deltas: find CPU spikes and new/gone processes
+  typeset -A s1_cpu s1_name s2_cpu s2_name
+  while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+    [[ -z "$pid" ]] && continue
+    s1_cpu[$pid]=$cpu
+    s1_name[$pid]=$basename
+  done <<< "$s1_agg_data"
+  while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+    [[ -z "$pid" ]] && continue
+    s2_cpu[$pid]=$cpu
+    s2_name[$pid]=$basename
+  done <<< "$s2_agg_data"
+
+  local sorted_s2
+  sorted_s2=$(echo "$s2_agg_data" | sort -t$'\t' -k2 -rn)
+
+  # CPU spikes (>10% increase)
+  local has_spikes='no' old_cpu spike int_spike color
+  while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+    [[ -z "$pid" ]] && continue
+    old_cpu=${s1_cpu[$pid]:-0}
+    spike=$(echo "$cpu - $old_cpu" | bc 2>/dev/null || echo "0")
+    int_spike=$(printf "%.0f" "$spike" 2>/dev/null || echo "0")
+    if (( ${int_spike:-0} > 10 )); then
+      if [[ "$has_spikes" == 'no' ]]; then
+        printf "\n${bold}${cyan}━━━ CPU Spikes ━━━${reset}\n\n"
+        has_spikes='yes'
+      fi
+      color=$(color_for_cpu "$cpu")
+      printf "  ${color}%-24s  %.1f%% → %.1f%%  (+%.1f%%)${reset}" "$basename" "$old_cpu" "$cpu" "$spike"
+      local cpu_int=${cpu%.*}
+      (( ${cpu_int:-0} > 100 )) && printf "%s" "$warn_marker"
+      printf "\n"
+    fi
+  done <<< "$sorted_s2"
+
+  # New processes (in s2 but not s1)
+  local has_new='no'
+  while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+    [[ -z "$pid" ]] && continue
+    if [[ -z "${s1_cpu[$pid]:-}" ]]; then
+      if [[ "$has_new" == 'no' ]]; then
+        printf "\n${bold}${cyan}━━━ New Processes ━━━${reset}\n\n"
+        has_new='yes'
+      fi
+      color=$(color_for_cpu "$cpu")
+      printf "  %-7s ${color}%-24s %6s%%${reset}  %s\n" "$pid" "$basename" "$cpu" "$(human_bytes "$rss")"
+    fi
+  done <<< "$sorted_s2"
+
+  # Gone processes (in s1 but not s2, only if they were significant)
+  local has_gone='no' int_cpu
+  while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+    [[ -z "$pid" ]] && continue
+    if [[ -z "${s2_cpu[$pid]:-}" ]]; then
+      int_cpu=${cpu%.*}
+      if (( ${int_cpu:-0} > 5 || rss > 51200 )); then
+        if [[ "$has_gone" == 'no' ]]; then
+          printf "\n${bold}${cyan}━━━ Gone Processes ━━━${reset}\n\n"
+          has_gone='yes'
+        fi
+        printf "  ${dim}%-7s %-24s  was %s%% CPU, %s${reset}\n" "$pid" "$basename" "$cpu" "$(human_bytes "$rss")"
+      fi
+    fi
+  done <<< "$s1_agg_data"
+}
+
+# ── Main ─────────────────────────────────────────────────────────────
+main() {
+  parse_arguments "$@"
+
+  if [[ "$mode" == 'watch' ]]; then
+    printf "${dim}Sampling system activity (snapshot 1 of 2)...${reset}" >&2
+    collect_snapshot 's1'
+    printf "\r\033[K" >&2
+
+    # Countdown
+    for i in 5 4 3 2 1; do
+      printf "\r${dim}Waiting %ds for delta...${reset}" "$i" >&2
+      sleep 1
+    done
+    printf "\r\033[K" >&2
+
+    printf "${dim}Sampling system activity (snapshot 2 of 2)...${reset}" >&2
+    collect_snapshot 's2'
+    get_spotlight_status
+    printf "\r\033[K" >&2
+
+    print_delta
+
+    if [[ "$action_mode" == 'interactive' ]]; then
+      # Use snapshot 2 data for suggestions
+      load_1=$s2_load_1
+      pressure=$s2_pressure
+      build_suggestions "$s2_agg_data"
+      print_suggestions
+    fi
+  else
+    printf "${dim}Sampling system activity...${reset}" >&2
+    read_top_summary
+    get_spotlight_status
+    printf "\r\033[K" >&2
+
+    # Collect aggregated process data once
+    local agg_data
+    agg_data=$(get_aggregated_processes)
+
+    check_anomalies
+    check_process_anomalies "$agg_data"
+
+    print_header
+    print_overview
+    print_disk_usage
+    print_anomaly_summary
+
+    # Dedup tracking
+    typeset -A shown_in_cpu
+
+    local sorted_by_cpu sorted_by_mem
+    sorted_by_cpu=$(echo "$agg_data" | sort -t$'\t' -k2 -rn | head -20)
+    sorted_by_mem=$(echo "$agg_data" | sort -t$'\t' -k4 -rn | head -10)
+
+    print_table_header "Top CPU Consumers"
+    while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+      [[ -z "$pid" ]] && continue
+      local int_cpu=${cpu%.*}
+      (( ${int_cpu:-0} < cpu_min )) && continue
+      shown_in_cpu[$pid]='shown'
+      print_agg_row "$pid" "$cpu" "$mem" "$rss" "$count" "$basename" "$full_args"
+    done <<< "$sorted_by_cpu"
+
+    print_table_header "Top Memory Consumers"
+    while IFS=$'\t' read -r pid cpu mem rss count basename full_args; do
+      [[ -z "$pid" ]] && continue
+      local int_mem=${mem%.*}
+      (( ${int_mem:-0} < mem_min )) && continue
+      if (( ${+shown_in_cpu[$pid]} )); then
+        print_agg_row "$pid" "$cpu" "$mem" "$rss" "$count" "$basename" "$full_args" "--" "(also top CPU)"
+      else
+        print_agg_row "$pid" "$cpu" "$mem" "$rss" "$count" "$basename" "$full_args"
+      fi
+    done <<< "$sorted_by_mem"
+
+    print_recent_processes "$recent_mins"
+
+    if [[ "$action_mode" == 'interactive' ]]; then
+      build_suggestions "$agg_data"
+      print_suggestions
+    fi
+  fi
+
+  printf "\n"
+}
+
+main "$@"
