@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/tal/Desktop/**)",
+      "Bash(ffprobe:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(brew search:*)",
+      "Bash(curl:*)",
+      "Bash(whisper-cli:*)",
+      "WebFetch(domain:jobs.ashbyhq.com)",
+      "WebFetch(domain:www.lifeatspotify.com)",
+      "WebFetch(domain:explore.jobs.netflix.net)",
+      "WebFetch(domain:job-boards.greenhouse.io)",
+      "WebFetch(domain:www.instagram.com)",
+      "Skill(update-config)",
+      "Bash(yt-dlp 'https://www.instagram.com/reel/DWM02r5EtFq/')",
+      "Read(//Users/tal/.config/yt-dlp/**)",
+      "Read(//Users/tal/**)",
+      "Bash(yt-dlp:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
