@@ -28,11 +28,11 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:gist.github.com)",
-      "WebFetch(domain:gist.githubusercontent.com)"
+      "WebFetch(domain:gist.githubusercontent.com)",
+      "Bash(mv /Users/tal/Downloads:*)"
     ],
     "ask": [
       "Bash(rm:*)",
-      "Bash(mv:*)",
       "Bash(git push:*)",
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
@@ -42,7 +42,6 @@
       "/tmp/"
     ]
   },
-  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
@@ -51,6 +50,15 @@
           {
             "type": "command",
             "command": "if [ -f .env ]; then set -a; source .env; set +a; env >> \"$CLAUDE_ENV_FILE\"; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "branch=$(git branch --show-current | tr '/' '-'); if [ -f \".claude/branches/$branch.md\" ]; then ln -sf \"$PWD/.claude/branches/$branch.md\" \"$PWD/.claude/current-branch.local.md\"; else rm -f \"$PWD/.claude/current-branch.local.md\"; fi"
           }
         ]
       }
@@ -71,7 +79,6 @@
     "command": "~/.claude/statusline-command.sh"
   },
   "enabledPlugins": {
-    "dd@datadog-claude-plugins": true,
     "plugin-dev@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "swift-concurrency@swift-concurrency-agent-skill": true,
@@ -82,9 +89,43 @@
     "code-simplifier@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "lua-lsp@claude-plugins-official": true,
-    "skill-creator@claude-plugins-official": true
+    "skill-creator@claude-plugins-official": true,
+    "firebase@claude-plugins-official": true,
+    "plannotator@plannotator": true,
+    "worktrunk@worktrunk": true,
+    "codex@openai-codex": true
+  },
+  "extraKnownMarketplaces": {
+    "expo-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "expo/skills"
+      }
+    },
+    "plannotator": {
+      "source": {
+        "source": "github",
+        "repo": "backnotprop/plannotator"
+      }
+    },
+    "worktrunk": {
+      "source": {
+        "source": "github",
+        "repo": "max-sixty/worktrunk"
+      }
+    },
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    }
   },
   "alwaysThinkingEnabled": true,
+  "effortLevel": "medium",
+  "autoUpdatesChannel": "stable",
+  "voiceEnabled": true,
+  "autoDreamEnabled": true,
   "skipDangerousModePermissionPrompt": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754080668867
