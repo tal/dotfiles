@@ -1,0 +1,270 @@
+{
+  "commands": [
+    {
+      "name": "Weather Range",
+      "workspace": {
+        "name": "Weather Range",
+        "cwd": "~/Projects/weather-range",
+        "color": "#1893F1",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Sports Range Coach",
+      "workspace": {
+        "name": "Sports Range Coach",
+        "cwd": "~/Projects/sports-range-coach",
+        "color": "#AF52DE",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "sport-range",
+      "workspace": {
+        "name": "sport-range",
+        "cwd": "~/Projects/sport-range",
+        "color": "#AF52DE",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Sport Range Player",
+      "workspace": {
+        "name": "Sport Range Player",
+        "cwd": "~/Projects/sport-range-player",
+        "color": "#3C4B9D",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Config",
+      "workspace": {
+        "name": "Config",
+        "cwd": "~/.config",
+        "color": "#8B8685",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Claude",
+      "workspace": {
+        "name": "Claude",
+        "cwd": "~/.claude",
+        "color": "#D97706",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Resume",
+      "workspace": {
+        "name": "Resume",
+        "cwd": "~/Documents",
+        "color": "#6B4226",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Downloads",
+      "workspace": {
+        "name": "Downloads",
+        "cwd": "~/Downloads",
+        "color": "#FF10F0",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Darr Manager",
+      "workspace": {
+        "name": "Darr Manager",
+        "cwd": "~/Projects/darr-manager",
+        "color": "#5C6370",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Mull It",
+      "workspace": {
+        "name": "Mull It",
+        "cwd": "~/Projects/mull-it",
+        "color": "#E06C75",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Spotify Playlist",
+      "workspace": {
+        "name": "Spotify Playlist",
+        "cwd": "~/Projects/spotify-playlist",
+        "color": "#1DB954",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Claude Marketplace",
+      "workspace": {
+        "name": "Claude Marketplace",
+        "cwd": "~/Projects/claude-marketplace",
+        "color": "#E87040",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Hammerspoon",
+      "workspace": {
+        "name": "Hammerspoon",
+        "cwd": "~/.hammerspoon",
+        "color": "#F4C430",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "HASS Config",
+      "workspace": {
+        "name": "HASS Config",
+        "cwd": "~/Projects/hass-config",
+        "color": "#41BDF5",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
