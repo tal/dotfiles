@@ -1,0 +1,44 @@
+#!/bin/bash
+# Auto-accepts "Allow X to access Xcode?" prompts.
+# Polls for the Xcode authorization dialog and clicks "Allow".
+# Agnostic to the agent name and PID in the prompt.
+#
+# Usage: xcode-mcp-auto-allow [interval_seconds] [max_iterations]
+#   interval:       polling interval in seconds (default: 0.5)
+#   max_iterations: stop after this many checks (default: 10, = 5s at 0.5s)
+
+INTERVAL="${1:-0.5}"
+MAX_ITERATIONS="${2:-10}"
+
+echo "Watching for Xcode access prompts every ${INTERVAL}s (max ${MAX_ITERATIONS} checks)..."
+
+for ((i = 1; i <= MAX_ITERATIONS; i++)); do
+  osascript <<'APPLESCRIPT' 2>/dev/null && { echo "[$(date '+%H:%M:%S')] Clicked Allow"; exit 0; }
+    tell application "System Events"
+      set targetWindow to missing value
+      repeat with proc in (every process whose background only is false)
+        repeat with win in (every window of proc)
+          try
+            set winTexts to value of every static text of win
+            repeat with t in winTexts
+              if t contains "wants to use Xcode's tools to perform actions" then
+                set targetWindow to win
+                exit repeat
+              end if
+            end repeat
+            if targetWindow is not missing value then exit repeat
+          end try
+        end repeat
+        if targetWindow is not missing value then exit repeat
+      end repeat
+
+      if targetWindow is missing value then error "No dialog found"
+
+      click button "Allow" of targetWindow
+    end tell
+APPLESCRIPT
+  sleep "$INTERVAL"
+done
+
+echo "No Xcode access prompt found after ${MAX_ITERATIONS} checks."
+exit 1
