@@ -9,6 +9,9 @@ alias ....='cd ../../..'
 # Claude aliases
 alias cyolo='claude --allow-dangerously-skip-permissions'
 
+# Muscle-memory: let `/exit` close the shell like it closes Claude Code
+alias /exit='exit'
+
 # cc function with shorthand parameter support
 cc() {
   local args=()
