@@ -795,11 +795,12 @@ print_suggestions() {
     printf "  ${bold}[%d]${reset} %s\n" "$i" "${suggestions[$i]}"
   done
 
-  printf "\n  Press number to execute, or Enter to skip: "
+  printf "\n  Press number to execute, Enter to skip, q to quit: "
   if ! read -r choice </dev/tty 2>/dev/null; then
     return
   fi
   [[ -z "$choice" ]] && return
+  [[ "$choice" == "q" || "$choice" == "Q" ]] && exit 0
 
   # Validate input
   if [[ ! "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#suggestions} )); then
