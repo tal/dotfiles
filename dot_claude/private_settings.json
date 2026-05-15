@@ -2,6 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "ENABLE_TOOL_SEARCH": "true",
+    "CLAUDE_CODE_NO_FLICKER": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "permissions": {
@@ -29,7 +30,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:gist.github.com)",
       "WebFetch(domain:gist.githubusercontent.com)",
-      "Bash(mv /Users/tal/Downloads:*)"
+      "Bash(mv /Users/tal/Downloads:*)",
+      "mcp__xcode__*"
     ],
     "ask": [
       "Bash(rm:*)",
@@ -38,6 +40,7 @@
       "Bash(git merge:*)",
       "Bash(git rebase:*)"
     ],
+    "defaultMode": "auto",
     "additionalDirectories": [
       "/tmp/"
     ]
@@ -90,10 +93,12 @@
     "claude-md-management@claude-plugins-official": true,
     "lua-lsp@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
-    "firebase@claude-plugins-official": true,
+    "firebase@claude-plugins-official": false,
     "plannotator@plannotator": true,
     "worktrunk@worktrunk": true,
-    "codex@openai-codex": true
+    "codex@openai-codex": true,
+    "imessage@claude-plugins-official": true,
+    "warp@claude-code-warp": true
   },
   "extraKnownMarketplaces": {
     "expo-plugins": {
@@ -119,14 +124,26 @@
         "source": "github",
         "repo": "openai/codex-plugin-cc"
       }
+    },
+    "claude-code-warp": {
+      "source": {
+        "source": "github",
+        "repo": "warpdotdev/claude-code-warp"
+      }
     }
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "medium",
-  "autoUpdatesChannel": "stable",
-  "voiceEnabled": true,
+  "effortLevel": "xhigh",
+  "autoUpdatesChannel": "latest",
+  "minimumVersion": "2.1.100",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
   "autoDreamEnabled": true,
   "skipDangerousModePermissionPrompt": true,
+  "skipAutoPermissionPrompt": true,
+  "voiceEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754080668867
   }

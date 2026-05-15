@@ -1,5 +1,11 @@
 {
   "enabledPlugins": {
     "karabiner@tal-marketplace": true
+  },
+  "permissions": {
+    "additionalDirectories": [
+      "/Users/tal/.claude",
+      "/Users/tal/.local/share/chezmoi"
+    ]
   }
 }
