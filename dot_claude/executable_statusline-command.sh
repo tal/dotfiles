@@ -58,39 +58,34 @@ fi
 # Get git branch (skip optional locks)
 branch=$(cd "$dir" 2>/dev/null && git -c core.fileMode=false -c gc.autodetach=false rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
-# Get PR URL for current branch (cached for 30s)
-pr_url=""
-if [ -n "$branch" ] && [ "$branch" != "main" ] && [ "$branch" != "master" ]; then
-  cache_file="/tmp/claude-statusline-pr-${dir//\//_}-${branch}"
-  cache_max_age=30
-  if [ -f "$cache_file" ] && [ $(($(date +%s) - $(stat -f %m "$cache_file" 2>/dev/null || echo 0))) -lt $cache_max_age ]; then
-    pr_url=$(cat "$cache_file")
-  else
-    pr_url=$(cd "$dir" 2>/dev/null && gh pr view --json url -q .url 2>/dev/null || echo "")
-    echo "$pr_url" > "$cache_file" 2>/dev/null
-  fi
-fi
-
 # Calculate context usage percentage
 usage=$(echo "$input" | jq '.context_window.current_usage')
 if [ "$usage" != "null" ]; then
   current=$(echo "$usage" | jq '.input_tokens + .cache_creation_input_tokens + .cache_read_input_tokens')
   size=$(echo "$input" | jq '.context_window.context_window_size')
   pct=$((current * 100 / size))
+  current_k=$((current / 1000))
+  if [ $current_k -ge 1000 ]; then
+    token_display="$((current_k / 1000)).$(( (current_k % 1000) / 100))m"
+  else
+    token_display="${current_k}k"
+  fi
 else
   pct=0
+  current_k=0
+  token_display="0k"
 fi
 
 # Define colors using ANSI escape codes
-# Cyan for directory
-DIR_COLOR="\033[36m"
-# Magenta for git branch
-BRANCH_COLOR="\033[35m"
+# Purple for directory (matches starship prompt #cc44ff)
+DIR_COLOR="\033[1;38;2;204;68;255m"
+# Green bold for git branch (matches starship git_branch style)
+BRANCH_COLOR="\033[1;32m"
 # Dynamic color for context based on usage level
-# Grey (<50%), Yellow (50-75%), Red (>75%)
-if [ $pct -lt 50 ]; then
+# Grey (<150k), Yellow (150k-500k), Red (>500k)
+if [ $current_k -lt 150 ]; then
   CONTEXT_COLOR="\033[90m"  # Grey
-elif [ $pct -lt 75 ]; then
+elif [ $current_k -lt 500 ]; then
   CONTEXT_COLOR="\033[33m"  # Yellow
 else
   CONTEXT_COLOR="\033[31m"  # Red
@@ -111,8 +106,16 @@ else
   CIRCLE="●"  # Full circle
 fi
 
+# Check battery level (macOS)
+battery_warning=""
+battery_pct=$(pmset -g batt 2>/dev/null | grep -oE '[0-9]+%' | head -1 | tr -d '%')
+if [ -n "$battery_pct" ] && [ "$battery_pct" -lt 20 ]; then
+  RED="\033[31m"
+  battery_warning="${RED}🪫 ${battery_pct}%${RESET}  "
+fi
+
 # Build output with colors
-output="${DIR_COLOR}${dir_display}${RESET}"
+output="${battery_warning}${DIR_COLOR}${dir_display}${RESET}"
 
 # Add branch if present
 if [ -n "$branch" ]; then
@@ -120,33 +123,7 @@ if [ -n "$branch" ]; then
 fi
 
 # Add context usage
-output="${output}  ${CONTEXT_COLOR}${CIRCLE} ${pct}%${RESET}"
-
-# Detect OSC 8 hyperlink support (mirrors supports-hyperlinks npm package)
-supports_osc8() {
-  case "${TERM_PROGRAM:-}" in
-    iTerm.app|WezTerm|ghostty|vscode|zed|Hyper) return 0 ;;
-  esac
-  [ -n "${CURSOR_TRACE_ID:-}" ] && return 0
-  [ -n "${WT_SESSION:-}" ] && return 0
-  [ -n "${VTE_VERSION:-}" ] && return 0
-  case "${TERM:-}" in
-    *alacritty*|*kitty*) return 0 ;;
-  esac
-  return 1
-}
-
-# Add PR link if available
-if [ -n "$pr_url" ]; then
-  PR_COLOR="\033[34m"
-  if supports_osc8; then
-    # Terminal renders clickable links natively - use short label
-    output="${output}  ${PR_COLOR}\033]8;;${pr_url}\033\\\\PR\033]8;;\033\\\\${RESET}"
-  else
-    # No link support - show full URL
-    output="${output}  ${PR_COLOR}${pr_url}${RESET}"
-  fi
-fi
+output="${output}  ${CONTEXT_COLOR}${CIRCLE} ${token_display}${RESET}"
 
 # Add worktree name at the end in light grey
 if [ -n "$worktree_name" ]; then
