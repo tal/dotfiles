@@ -46,13 +46,19 @@ fi
 # Build dir_display: project name + relative path (same whether in worktree or not)
 if [ "$initial_dir" = "$current_dir" ]; then
   dir_display="$project_name"
-else
-  rel_path="${current_dir#"$initial_dir"}"
-  rel_path="${rel_path#/}"
-  if [ -z "$rel_path" ]; then
-    rel_path="$(basename "$current_dir")"
-  fi
+elif [ "${current_dir#"$initial_dir"/}" != "$current_dir" ]; then
+  # current_dir is a descendant of initial_dir -> show relative path
+  rel_path="${current_dir#"$initial_dir"/}"
   dir_display="$project_name (${rel_path}/)"
+else
+  # current_dir is outside initial_dir -> show full absolute path (with ~ for HOME)
+  abs_path="$current_dir"
+  if [ "${abs_path#"$HOME"/}" != "$abs_path" ]; then
+    abs_path="~/${abs_path#"$HOME"/}"
+  elif [ "$abs_path" = "$HOME" ]; then
+    abs_path="~"
+  fi
+  dir_display="$project_name ($abs_path)"
 fi
 
 # Get git branch (skip optional locks)
