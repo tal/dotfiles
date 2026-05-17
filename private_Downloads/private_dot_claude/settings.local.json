@@ -16,7 +16,12 @@
       "Bash(yt-dlp 'https://www.instagram.com/reel/DWM02r5EtFq/')",
       "Read(//Users/tal/.config/yt-dlp/**)",
       "Read(//Users/tal/**)",
-      "Bash(yt-dlp:*)"
+      "Bash(yt-dlp:*)",
+      "Skill(sort-videos)",
+      "Bash(mkdir -p \"/Users/tal/Downloads/AI Library/Food & Restaurants\")",
+      "Bash(mkdir -p \"/Users/tal/Downloads/AI Library/Children & Parenting\")",
+      "Bash(mv \"/Users/tal/Downloads/Instagram - Video by foodbabyny [DYNq1rQRAgS].mp4\" \"/Users/tal/Downloads/AI Library/Food & Restaurants/montoyas-mexican-forest-hills - Instagram - Video by foodbabyny [DYNq1rQRAgS].mp4\")",
+      "Bash(mv \"/Users/tal/Downloads/Instagram - Video by marriageishappening [DWECr9HJG5p].mp4\" \"/Users/tal/Downloads/AI Library/Children & Parenting/unpopular-mom-rules-chores-grades - Instagram - Video by marriageishappening [DWECr9HJG5p].mp4\")"
     ],
     "deny": [],
     "ask": []
