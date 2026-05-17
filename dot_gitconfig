@@ -61,7 +61,7 @@
 
 [user]
         name = Tal Atlas
-	email = tal.atlas@datadoghq.com
+	email = me@tal.by
 
 [core]
         editor = vim
