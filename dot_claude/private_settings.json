@@ -2,7 +2,6 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "ENABLE_TOOL_SEARCH": "true",
-    "CLAUDE_CODE_NO_FLICKER": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "permissions": {
@@ -33,13 +32,6 @@
       "Bash(mv /Users/tal/Downloads:*)",
       "mcp__xcode__*"
     ],
-    "ask": [
-      "Bash(rm:*)",
-      "Bash(git push:*)",
-      "Bash(git checkout:*)",
-      "Bash(git merge:*)",
-      "Bash(git rebase:*)"
-    ],
     "defaultMode": "auto",
     "additionalDirectories": [
       "/tmp/"
@@ -61,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "branch=$(git branch --show-current | tr '/' '-'); if [ -f \".claude/branches/$branch.md\" ]; then ln -sf \"$PWD/.claude/branches/$branch.md\" \"$PWD/.claude/current-branch.local.md\"; else rm -f \"$PWD/.claude/current-branch.local.md\"; fi"
+            "command": "branch=$(git branch --show-current 2>/dev/null | tr '/' '-'); file=\".claude/branches/$branch.md\"; if [ -n \"$branch\" ] && [ -f \"$file\" ]; then ln -sf \"$PWD/$file\" \"$PWD/.claude/current-branch.local.md\"; jq -Rn --arg b \"$branch\" --rawfile c \"$file\" '{hookSpecificOutput: {hookEventName: \"SessionStart\", additionalContext: (\"# Branch context: \" + $b + \"\\n\\n\" + $c)}}'; else rm -f \"$PWD/.claude/current-branch.local.md\"; fi"
           }
         ]
       }
@@ -98,7 +90,9 @@
     "worktrunk@worktrunk": true,
     "codex@openai-codex": true,
     "imessage@claude-plugins-official": true,
-    "warp@claude-code-warp": true
+    "warp@claude-code-warp": true,
+    "iconifier@tal-marketplace": true,
+    "playground@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "expo-plugins": {
@@ -130,10 +124,23 @@
         "source": "github",
         "repo": "warpdotdev/claude-code-warp"
       }
+    },
+    "swiftui-agent-skill": {
+      "source": {
+        "source": "github",
+        "repo": "twostraws/SwiftUI-Agent-Skill"
+      }
+    },
+    "supabase-agent-skills": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/supabase/agent-skills.git"
+      }
     }
   },
+  "language": "shitposter circa tumblr 2016 but with proper capitalization and more emojis",
   "alwaysThinkingEnabled": true,
-  "effortLevel": "xhigh",
+  "effortLevel": "high",
   "autoUpdatesChannel": "latest",
   "minimumVersion": "2.1.100",
   "voice": {
@@ -142,6 +149,11 @@
   },
   "autoDreamEnabled": true,
   "skipDangerousModePermissionPrompt": true,
+  "theme": "auto",
+  "editorMode": "vim",
+  "autoCompactEnabled": false,
+  "teammateMode": "auto",
+  "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "voiceEnabled": true,
   "feedbackSurveyState": {
