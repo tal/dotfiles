@@ -918,231 +918,6 @@
                         ]
                     },
                     {
-                        "description": "Cmd+Shift+[1-0] to Ctrl+[1-0] in Slack",
-                        "manipulators": [
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "1",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"1\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "2",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"2\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "3",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"3\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "4",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"4\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "5",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"5\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "6",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"6\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "7",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"7\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "8",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"8\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "9",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"9\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "0",
-                                    "modifiers": {
-                                        "mandatory": ["command", "shift"]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "shell_command": "osascript -e 'tell application \"System Events\" to tell process \"Slack\" to keystroke \"0\" using control down'"
-                                    }
-                                ],
-                                "conditions": [
-                                    {
-                                        "type": "frontmost_application_if",
-                                        "bundle_identifiers": [
-                                            "^com\\.tinyspeck\\.slackmacgap$"
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
                         "description": "Ctrl+1 to launch or focus VS Code",
                         "manipulators": [
                             {
@@ -1183,9 +958,7 @@
                                             "value": 1
                                         }
                                     },
-                                    {
-                                        "shell_command": "/opt/homebrew/bin/terminal-notifier -ignoreDnD -title 'Terminal Mode Switched' -message 'Terminal: Ghostty'"
-                                    }
+                                    { "shell_command": "/opt/homebrew/bin/terminal-notifier -ignoreDnD -title 'Terminal Mode Switched' -message 'Terminal: Ghostty'" }
                                 ],
                                 "type": "basic"
                             },
@@ -1211,9 +984,7 @@
                                             "value": 2
                                         }
                                     },
-                                    {
-                                        "shell_command": "/opt/homebrew/bin/terminal-notifier -ignoreDnD -title 'Terminal Mode Switched' -message 'Terminal: Warp'"
-                                    }
+                                    { "shell_command": "/opt/homebrew/bin/terminal-notifier -ignoreDnD -title 'Terminal Mode Switched' -message 'Terminal: Warp'" }
                                 ],
                                 "type": "basic"
                             },
@@ -1239,9 +1010,7 @@
                                             "value": 0
                                         }
                                     },
-                                    {
-                                        "shell_command": "/opt/homebrew/bin/terminal-notifier -ignoreDnD -title 'Terminal Mode Switched' -message 'Terminal: cmux nightly'"
-                                    }
+                                    { "shell_command": "/opt/homebrew/bin/terminal-notifier -ignoreDnD -title 'Terminal Mode Switched' -message 'Terminal: cmux nightly'" }
                                 ],
                                 "type": "basic"
                             }
@@ -1379,9 +1148,7 @@
                                 ],
                                 "from": {
                                     "key_code": "p",
-                                    "modifiers": {
-                                        "mandatory": ["command"]
-                                    }
+                                    "modifiers": { "mandatory": ["command"] }
                                 },
                                 "to": [
                                     {
@@ -1407,9 +1174,7 @@
                                 ],
                                 "from": {
                                     "key_code": "p",
-                                    "modifiers": {
-                                        "mandatory": ["command"]
-                                    }
+                                    "modifiers": { "mandatory": ["command"] }
                                 },
                                 "to": [
                                     {
