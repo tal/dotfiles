@@ -45,6 +45,11 @@
           "key" : "w",
           "type" : "application",
           "value" : "/Applications/WhatsApp.app"
+        },
+        {
+          "key" : "b",
+          "type" : "application",
+          "value" : "/Applications/Beeper Desktop.app"
         }
       ],
       "key" : "a",
@@ -81,9 +86,10 @@
           "value" : "/Applications/Fantastical.app"
         },
         {
+          "iconPath" : "calendar",
           "key" : "g",
-          "type" : "application",
-          "value" : "/Users/tal.atlas/Applications/Chrome Apps.localized/Google Calendar.app"
+          "type" : "url",
+          "value" : "https://calendar.google.com"
         }
       ],
       "key" : "f",
@@ -94,13 +100,6 @@
       "key" : "c",
       "type" : "application",
       "value" : "/Applications/Slack.app"
-    },
-    {
-      "iconPath" : "/Applications/Craft.app",
-      "key" : "d",
-      "label" : "Daily Notes",
-      "type" : "url",
-      "value" : "craftdocs://open?blockId=B7B0FF75-8293-4685-9671-8357236CC9C0&spaceId=7a49f182-e85d-8d76-0f88-cc6686ecdb13"
     },
     {
       "iconPath" : "/Applications/zoom.us.app",
@@ -116,17 +115,17 @@
     {
       "actions" : [
         {
-          "key" : "o",
+          "key" : "x",
           "type" : "application",
           "value" : "/Applications/Codex.app"
         },
         {
-          "key" : "l",
+          "key" : "c",
           "type" : "application",
           "value" : "/Applications/Claude.app"
         },
         {
-          "key" : "c",
+          "key" : "o",
           "type" : "application",
           "value" : "/Applications/ChatGPT.app"
         }
