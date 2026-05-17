@@ -20,7 +20,9 @@ disabledIdentifiers = [
     'TunaSafari.SafariFavoritesSearchCatalog',
     'TunaSafari.SafariMetaCatalog',
     'TunaSafari.SafariReadingListCatalog',
-    'TunaSafari.SafariReadingListSearchCatalog'
+    'TunaSafari.SafariReadingListSearchCatalog',
+    'TunaSystem.AllWindowsCatalog',
+    'TunaSystem.AllWindowsSearchCatalog'
 ]
 disabledItemKeys = []
 sortOrders = []
