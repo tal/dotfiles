@@ -265,6 +265,25 @@
           }
         }
       }
+    },
+    {
+      "name": "Documents",
+      "workspace": {
+        "name": "Documents",
+        "cwd": "~/Documents",
+        "color": "#7B4B2A",
+        "restart": "confirm",
+        "layout": {
+          "pane": {
+            "surfaces": [
+              {
+                "type": "terminal",
+                "name": "Terminal"
+              }
+            ]
+          }
+        }
+      }
     }
   ]
 }
