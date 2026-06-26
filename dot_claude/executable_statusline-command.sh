@@ -61,6 +61,11 @@ else
   dir_display="$project_name ($abs_path)"
 fi
 
+# Extract model name and reasoning effort level (effort absent on unsupported models)
+# Collapse a "(1M context)" suffix into a compact "m" tag (e.g. "Opus 4.8 (1M context)" -> "Opus 4.8m")
+model_name=$(echo "$input" | jq -r '(.model.display_name // empty) | gsub("\\s*\\(1M context\\)"; "m"; "i")')
+effort_level=$(echo "$input" | jq -r '.effort.level // empty')
+
 # Get git branch (skip optional locks)
 branch=$(cd "$dir" 2>/dev/null && git -c core.fileMode=false -c gc.autodetach=false rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
@@ -135,6 +140,16 @@ output="${output}  ${CONTEXT_COLOR}${CIRCLE} ${token_display}${RESET}"
 if [ -n "$worktree_name" ]; then
   GREY="\033[90m"
   output="${output}  ${GREY}worktree: ${worktree_name}${RESET}"
+fi
+
+# Add model + effort on the right side in light grey, separated by an en dash
+MODEL_COLOR="\033[90m"
+if [ -n "$model_name" ]; then
+  model_display="$model_name"
+  if [ -n "$effort_level" ]; then
+    model_display="${model_display}–${effort_level}"
+  fi
+  output="${output}  ${MODEL_COLOR}${model_display}${RESET}"
 fi
 
 echo -e "$output"
