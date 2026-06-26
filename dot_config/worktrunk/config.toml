@@ -1,0 +1,17 @@
+[commit.generation]
+command = "CLAUDECODE= MAX_THINKING_TOKENS=0 claude -p --no-session-persistence --model=haiku --tools='' --disable-slash-commands --setting-sources='' --system-prompt=''"
+
+[merge]
+squash = false
+
+[aliases]
+sc = "wt switch --create {{ args }}"
+# Rebase the current branch onto the local primary branch (main/master,
+# resolved automatically by {{ default_branch }}).
+rebase = "git rebase {{ default_branch }}"
+# Rename the current branch AND move its worktree dir to match the default
+# worktree-path template ({{ repo }}.{{ branch | sanitize }} beside the repo).
+# Run from inside the feature worktree: `wt rename <new-name>`. We hop to the
+# primary worktree before moving so our shell cwd doesn't go stale under us,
+# then `wt switch` cds into the relocated worktree.
+rename = "src=\"$(git rev-parse --show-toplevel)\" && git branch -m {{ args }} && cd {{ primary_worktree_path }} && git worktree move \"$src\" \"{{ primary_worktree_path }}/../{{ repo }}.$(printf %s '{{ args }}' | tr / -)\" && wt switch {{ args }}"
