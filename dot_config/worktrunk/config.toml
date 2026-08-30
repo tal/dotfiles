@@ -4,6 +4,9 @@ command = "CLAUDECODE= MAX_THINKING_TOKENS=0 claude -p --no-session-persistence 
 [merge]
 squash = false
 
+[list]
+summary = true
+
 [aliases]
 sc = "wt switch --create {{ args }}"
 # Rebase the current branch onto the local primary branch (main/master,

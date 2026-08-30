@@ -1,3 +1,7 @@
+# Treat a directory name in command position as `cd <directory>`.
+# Zsh's _autocd completer also offers directories alongside PATH commands.
+setopt AUTO_CD
+
 # Zsh completions for cc (claude) function
 
 _cc() {

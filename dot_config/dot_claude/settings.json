@@ -5,7 +5,8 @@
   "permissions": {
     "additionalDirectories": [
       "/Users/tal/.claude",
-      "/Users/tal/.local/share/chezmoi"
+      "/Users/tal/.local/share/chezmoi",
+      "/Users/tal/.hammerspoon"
     ]
   }
 }

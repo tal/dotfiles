@@ -115,6 +115,44 @@
     {
       "actions" : [
         {
+          "key" : "a",
+          "label" : "stash-left",
+          "type" : "url",
+          "value" : "rectangle-pro://execute-action?name=stash-left"
+        },
+        {
+          "key" : "d",
+          "label" : "stash-right",
+          "type" : "url",
+          "value" : "rectangle-pro://execute-action?name=stash-right"
+        },
+        {
+          "key" : "x",
+          "label" : "stash-down",
+          "type" : "url",
+          "value" : "rectangle-pro://execute-action?name=stash-down"
+        }
+      ],
+      "key" : "s",
+      "label" : "Stash",
+      "type" : "group"
+    },
+    {
+      "actions" : [
+        {
+          "key" : "i",
+          "label" : "iOS Agent Work",
+          "type" : "url",
+          "value" : "rectangle-pro://execute-layout?name=iOS%20Agent%20Work"
+        }
+      ],
+      "key" : "t",
+      "label" : "Templates",
+      "type" : "group"
+    },
+    {
+      "actions" : [
+        {
           "key" : "x",
           "type" : "application",
           "value" : "/Applications/Codex.app"
@@ -128,10 +166,20 @@
           "key" : "o",
           "type" : "application",
           "value" : "/Applications/ChatGPT.app"
+        },
+        {
+          "key" : "l",
+          "type" : "application",
+          "value" : "/Applications/Claude.app"
         }
       ],
       "key" : "l",
       "type" : "group"
+    },
+    {
+      "key" : "d",
+      "type" : "application",
+      "value" : "/Applications/Due.app"
     }
   ],
   "type" : "group"
