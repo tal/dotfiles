@@ -2,12 +2,16 @@
 
 _cc() {
   local -a claude_options shorthand_commands
+  local state
 
-  # Shorthand commands (a, c, and r)
+  # Shorthand commands (c, r) and bare model names -> --model <name>
   shorthand_commands=(
-    'a:Enable auto mode (safer alternative to skip permissions)'
     'c:Continue the most recent conversation'
     'r:Resume a conversation by session ID'
+    'opus:Use the Opus model (--model opus)'
+    'sonnet:Use the Sonnet model (--model sonnet)'
+    'haiku:Use the Haiku model (--model haiku)'
+    'fable:Use the Fable model (--model fable)'
   )
 
   # Claude options and flags
@@ -58,20 +62,14 @@ _cc() {
     '--tools[Specify the list of available tools]:tools:'
   )
 
+  # '*' so shorthands/models are offered at any position, not just the first
   _arguments -s -S \
-    '1: :->commands' \
-    '*:: :->options' \
-    && return 0
+    '*: :->args' \
+    $claude_options
 
-  case $state in
-    commands)
-      _describe -t shorthand-commands 'shorthand commands' shorthand_commands
-      _describe -t claude-options 'claude options' claude_options
-      ;;
-    options)
-      _describe -t claude-options 'claude options' claude_options
-      ;;
-  esac
+  if [[ $state == args ]]; then
+    _describe -t shorthand-commands 'shorthand commands' shorthand_commands
+  fi
 }
 
 # Register completion for cc function
@@ -80,6 +78,7 @@ compdef _cc cc
 # Zsh completions for claude binary
 _claude() {
   local -a claude_subcommands claude_options
+  local state
 
   claude_subcommands=(
     'api:Send a single API request'
@@ -137,19 +136,12 @@ _claude() {
   )
 
   _arguments -s -S \
-    '1: :->commands' \
-    '*:: :->options' \
-    && return 0
+    '1: :->firstarg' \
+    $claude_options
 
-  case $state in
-    commands)
-      _describe -t subcommands 'claude subcommands' claude_subcommands
-      _describe -t claude-options 'claude options' claude_options
-      ;;
-    options)
-      _describe -t claude-options 'claude options' claude_options
-      ;;
-  esac
+  if [[ $state == firstarg ]]; then
+    _describe -t subcommands 'claude subcommands' claude_subcommands
+  fi
 }
 
 compdef _claude claude

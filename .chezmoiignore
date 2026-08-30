@@ -2,3 +2,6 @@
 .config/karabiner/automatic_backups/**
 
 .config/.claude/settings.local.json
+
+# Runtime log written by cmux's notification-sound script — not config, don't track
+.config/cmux/notification-sound.log

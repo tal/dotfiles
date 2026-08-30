@@ -934,7 +934,7 @@
                         ]
                     },
                     {
-                        "description": "Ctrl+0 to cycle terminal mode between cmux nightly, Ghostty, and Warp",
+                        "description": "Ctrl+0 to cycle terminal mode between cmux nightly, Ghostty, Warp, and Orca",
                         "manipulators": [
                             {
                                 "conditions": [
@@ -1007,6 +1007,32 @@
                                     {
                                         "set_variable": {
                                             "name": "terminal_mode",
+                                            "value": 3
+                                        }
+                                    },
+                                    { "shell_command": "/opt/homebrew/bin/terminal-notifier -ignoreDnD -title 'Terminal Mode Switched' -message 'Terminal: Orca'" }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "name": "terminal_mode",
+                                        "type": "variable_if",
+                                        "value": 3
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "0",
+                                    "modifiers": {
+                                        "mandatory": ["control"],
+                                        "optional": ["any"]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "set_variable": {
+                                            "name": "terminal_mode",
                                             "value": 0
                                         }
                                     },
@@ -1017,8 +1043,30 @@
                         ]
                     },
                     {
-                        "description": "Ctrl+` to launch terminal (cmux nightly, Ghostty, or Warp based on terminal_mode)",
+                        "description": "Ctrl+` to launch terminal (cmux nightly, Ghostty, Warp, or Orca based on terminal_mode)",
                         "manipulators": [
+                            {
+                                "conditions": [
+                                    {
+                                        "name": "terminal_mode",
+                                        "type": "variable_if",
+                                        "value": 0
+                                    },
+                                    {
+                                        "type": "frontmost_application_if",
+                                        "bundle_identifiers": ["^com\\.cmuxterm\\.app\\.nightly$"]
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "grave_accent_and_tilde",
+                                    "modifiers": {
+                                        "mandatory": ["control"],
+                                        "optional": ["any"]
+                                    }
+                                },
+                                "to": [{ "key_code": "tab", "modifiers": ["left_command"] }],
+                                "type": "basic"
+                            },
                             {
                                 "conditions": [
                                     {
@@ -1035,6 +1083,28 @@
                                     }
                                 },
                                 "to": [{ "shell_command": "open -a 'cmux-NIGHTLY'" }],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "name": "terminal_mode",
+                                        "type": "variable_if",
+                                        "value": 1
+                                    },
+                                    {
+                                        "type": "frontmost_application_if",
+                                        "bundle_identifiers": ["^com\\.mitchellh\\.ghostty$"]
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "grave_accent_and_tilde",
+                                    "modifiers": {
+                                        "mandatory": ["control"],
+                                        "optional": ["any"]
+                                    }
+                                },
+                                "to": [{ "key_code": "tab", "modifiers": ["left_command"] }],
                                 "type": "basic"
                             },
                             {
@@ -1061,6 +1131,28 @@
                                         "name": "terminal_mode",
                                         "type": "variable_if",
                                         "value": 2
+                                    },
+                                    {
+                                        "type": "frontmost_application_if",
+                                        "bundle_identifiers": ["^dev\\.warp\\.Warp-Stable$"]
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "grave_accent_and_tilde",
+                                    "modifiers": {
+                                        "mandatory": ["control"],
+                                        "optional": ["any"]
+                                    }
+                                },
+                                "to": [{ "key_code": "tab", "modifiers": ["left_command"] }],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "name": "terminal_mode",
+                                        "type": "variable_if",
+                                        "value": 2
                                     }
                                 ],
                                 "from": {
@@ -1071,6 +1163,46 @@
                                     }
                                 },
                                 "to": [{ "shell_command": "open -a 'Warp'" }],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "name": "terminal_mode",
+                                        "type": "variable_if",
+                                        "value": 3
+                                    },
+                                    {
+                                        "type": "frontmost_application_if",
+                                        "bundle_identifiers": ["^com\\.stablyai\\.orca$"]
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "grave_accent_and_tilde",
+                                    "modifiers": {
+                                        "mandatory": ["control"],
+                                        "optional": ["any"]
+                                    }
+                                },
+                                "to": [{ "key_code": "tab", "modifiers": ["left_command"] }],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "name": "terminal_mode",
+                                        "type": "variable_if",
+                                        "value": 3
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "grave_accent_and_tilde",
+                                    "modifiers": {
+                                        "mandatory": ["control"],
+                                        "optional": ["any"]
+                                    }
+                                },
+                                "to": [{ "shell_command": "open -a 'Orca'" }],
                                 "type": "basic"
                             }
                         ]

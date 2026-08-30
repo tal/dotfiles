@@ -1,0 +1,40 @@
+#!/bin/sh
+# install-age-key — ensure the age identity exists at ~/.config/age/key.txt,
+# fetching it from 1Password if missing. Not chezmoi-specific: any service that
+# needs the age key (chezmoi, sops, rage, manual `age -d`, ...) can rely on this.
+#
+# Usage:
+#   install-age-key          # write the key only if it's missing
+#   install-age-key --force  # overwrite whatever is there with the 1Password copy
+#
+# Source of truth: 1Password document "chezmoi age key" in the Private vault.
+
+set -eu
+
+KEY_PATH="${AGE_KEY_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/age/key.txt}"
+OP_ITEM="chezmoi age key"
+OP_VAULT="Private"
+
+FORCE=0
+case "${1:-}" in
+    -f|--force) FORCE=1 ;;
+    "") ;;
+    *) echo "install-age-key: unknown argument '$1'" >&2; exit 2 ;;
+esac
+
+if [ -f "$KEY_PATH" ] && [ "$FORCE" -eq 0 ]; then
+    exit 0
+fi
+
+if ! command -v op >/dev/null 2>&1; then
+    echo "install-age-key: '1Password CLI' (op) not found." >&2
+    echo "  Install it (brew install 1password-cli), sign in (op signin), then re-run." >&2
+    exit 1
+fi
+
+echo "install-age-key: fetching age key from 1Password ($OP_VAULT/$OP_ITEM)..." >&2
+mkdir -p "$(dirname "$KEY_PATH")"
+umask 077
+op document get "$OP_ITEM" --vault "$OP_VAULT" --out-file "$KEY_PATH" --force
+chmod 600 "$KEY_PATH"
+echo "install-age-key: wrote $KEY_PATH" >&2

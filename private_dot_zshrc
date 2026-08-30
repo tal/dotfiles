@@ -9,17 +9,32 @@ eval "$(starship init zsh)"
 # Configure zsh-autocomplete
 zstyle ':autocomplete:*complete*:*' insert-unambiguous yes  # Only insert the unambiguous part first
 [ -f /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh ] && source /opt/homebrew/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
-# Override Tab binding AFTER plugin loads — use menu-select to show and cycle through matches
+[ -f ~/.letta-code/env ] && source ~/.letta-code/env
+
+# fzf. `fzf --zsh` fully supersedes the old ~/.fzf.zsh installer stub, which just
+# re-sourced the same completion/key-binding files plus a PATH entry that
+# /opt/homebrew/bin already covers.
+# -i makes fzf matching case-insensitive (it defaults to smart-case, so a single
+# capital letter silently flips it to case-sensitive). zoxide's `zi` inherits
+# this. Do NOT use _ZO_FZF_OPTS instead — that *replaces* zoxide's own fzf flags
+# and you lose the preview pane, height, keybinds and --exact.
+export FZF_DEFAULT_OPTS="-i"
+source <(fzf --zsh)
+
+# Override Tab binding AFTER both zsh-autocomplete AND fzf load — fzf's shell
+# integration rebinds ^I to fzf-completion, so this has to come last to stick.
 bindkey '^I' menu-select
 bindkey "$terminfo[kcbt]" menu-select
 # Inside the menu: Tab cycles forward, Shift+Tab cycles backward (instead of arrow-key navigation)
 bindkey -M menuselect '^I' menu-complete
 bindkey -M menuselect "$terminfo[kcbt]" reverse-menu-complete
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-[ -f ~/.letta-code/env ] && source ~/.letta-code/env
-
-source <(fzf --zsh)
-eval "$(zoxide init zsh)"
+# Escape the menu, restoring the command line to exactly what it was before Tab.
+# zsh-autocomplete builds its own menuselect keymap and never binds ^G, so Zsh's
+# default ^G -> send-break does not survive; without these there is NO clean exit
+# (any unbound key leaves the menu but keeps the highlighted match inserted).
+# ^[ costs one KEYTIMEOUT (0.4s) to disambiguate from the arrow-key sequences.
+bindkey -M menuselect '^G' send-break
+bindkey -M menuselect '^[' send-break
 
 export PATH="$PATH:$HOME/.config/bin"
 
@@ -60,13 +75,16 @@ fi
 # Google Cloud SDK
 [ -f "/opt/homebrew/share/google-cloud-sdk/path.zsh.inc" ] && source "/opt/homebrew/share/google-cloud-sdk/path.zsh.inc"
 
-# Load completion system
-autoload -Uz compinit
-compinit
+# NOTE: no `compinit` here on purpose. zsh-autocomplete (sourced above) runs its
+# own compinit via Functions/Init/.autocomplete__compinit and manages its own
+# dump file, so calling it again just re-scans for nothing. Verified: dropping it
+# leaves $#_comps unchanged at 1759 and saves ~24ms per shell.
+# To pass args to Autocomplete's compinit: zstyle '*:compinit' arguments -C
 
-# Cache completion to speed things up
+# Cache completion to speed things up. Same path Autocomplete uses for its dump,
+# so there is one completion cache instead of two.
 zstyle ':completion:*' use-cache on
-zstyle ':completion:*' cache-path ~/.zsh/cache
+zstyle ':completion:*' cache-path "${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
 
 # Fuzzy matching of completions
 zstyle ':completion:*' completer _complete _match _approximate
@@ -76,8 +94,9 @@ zstyle ':completion:*:approximate:*' max-errors 1 numeric
 # Case-insensitive completion
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
-# List completions and cycle through them (don't auto-select first)
-zstyle ':completion:*' menu select
+# List completions and cycle through them (don't auto-select first).
+# No `zstyle ':completion:*' menu select` needed — Tab is bound directly to the
+# menu-select widget above, which enters menu selection regardless of the zstyle.
 setopt AUTO_LIST           # List choices on ambiguous completion
 setopt LIST_AMBIGUOUS      # Show list immediately when ambiguous
 unsetopt MENU_COMPLETE     # Don't insert first match immediately
@@ -97,6 +116,10 @@ if [ -d "$HOME/.config/zsh" ]; then
         [ -r "$config_file" ] && source "$config_file"
     done
 fi
+
+# zoxide (init, worktrunk-aware `z`/`zi`, tab completion, typeahead) lives in
+# ~/.config/zsh/zzz-zoxide.zsh, sourced by the loop just above. It must load
+# after `compinit`, which that loop already guarantees.
 
 # Claude
 export PATH="$HOME/.claude/local:$PATH"

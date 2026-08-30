@@ -1,0 +1,929 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+name=${0:t}
+
+problem_re=${AIRPODS_MATCH:-'AirPods|ProPod|Beats|Powerbeats'}
+safe_output_re=${AIRPODS_SAFE_OUTPUT:-'MacBook.*Speakers|Built-?in Output|Internal Speakers'}
+safe_input_re=${AIRPODS_SAFE_INPUT:-'MacBook.*Microphone|Built-?in Microphone|Internal Microphone'}
+interval=${AIRPODS_WATCH_INTERVAL:-5}
+prompt_timeout=${AIRPODS_PROMPT_TIMEOUT:-15}
+verify_delay=${AIRPODS_VERIFY_DELAY:-2}
+
+if [[ -t 1 && "${NO_COLOR:-}" == "" ]]; then
+  bold=$'\033[1m'
+  red=$'\033[31m'
+  yellow=$'\033[33m'
+  green=$'\033[32m'
+  reset=$'\033[0m'
+else
+  bold=""
+  red=""
+  yellow=""
+  green=""
+  reset=""
+fi
+
+usage() {
+  cat <<EOF
+Usage:
+  $name check
+  $name fix
+  $name watch [seconds]
+  $name route
+  $name assertions
+  $name activity
+  $name media-sessions
+  $name kill-sim-audio
+  $name reset-media
+
+What it does:
+  - Uses CoreAudio to inspect and change default audio devices.
+  - Uses pmset assertions to identify processes that currently hold audio-out/audio-in.
+  - Shows Now Playing / MediaRemote helpers as context, not as proof of a problem.
+  - Avoids Bluetooth commands entirely.
+
+Defaults:
+  AIRPODS_MATCH="$problem_re"
+  AIRPODS_SAFE_OUTPUT="$safe_output_re"
+  AIRPODS_SAFE_INPUT="$safe_input_re"
+  AIRPODS_PROMPT_TIMEOUT="$prompt_timeout"
+  AIRPODS_VERIFY_DELAY="$verify_delay"
+
+Typical use:
+  $name check
+  $name fix
+  $name watch 5
+EOF
+}
+
+coreaudio() {
+  local swift_dir swift_file
+  swift_dir=$(mktemp -d "${TMPDIR:-/tmp}/airpods-audio-coreaudio.XXXXXX")
+  swift_file="$swift_dir/main.swift"
+  trap 'rm -rf "$swift_dir"' EXIT
+
+  cat >"$swift_file" <<'SWIFT'
+import Foundation
+import CoreAudio
+import Darwin
+
+struct Device {
+    let id: AudioDeviceID
+    let name: String
+    let uid: String
+    let transport: UInt32
+    let hasOutput: Bool
+    let hasInput: Bool
+    let isRunning: Bool
+}
+
+struct AudioProcessInfo {
+    let pid: pid_t
+    let bundleID: String
+    let executablePath: String
+    let runningInput: Bool
+    let runningOutput: Bool
+    let inputDevices: [AudioObjectID]
+    let outputDevices: [AudioObjectID]
+}
+
+let args = CommandLine.arguments
+guard args.count >= 2 else {
+    fputs("missing command\n", stderr)
+    exit(2)
+}
+
+let command = args[1]
+let problemPattern = args.count > 2 ? args[2] : "AirPods|ProPod|Beats|Powerbeats"
+let outputPattern = args.count > 3 ? args[3] : "MacBook.*Speakers|Built-?in Output|Internal Speakers"
+let inputPattern = args.count > 4 ? args[4] : "MacBook.*Microphone|Built-?in Microphone|Internal Microphone"
+let force = args.contains("--force")
+
+func die(_ message: String, _ code: Int32 = 1) -> Never {
+    fputs(message + "\n", stderr)
+    exit(code)
+}
+
+func check(_ status: OSStatus, _ message: String) {
+    if status != noErr {
+        die("\(message): OSStatus \(status)")
+    }
+}
+
+func address(_ selector: AudioObjectPropertySelector,
+             _ scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
+    return AudioObjectPropertyAddress(
+        mSelector: selector,
+        mScope: scope,
+        mElement: kAudioObjectPropertyElementMain
+    )
+}
+
+func stringProperty(_ objectID: AudioObjectID, _ selector: AudioObjectPropertySelector) -> String {
+    var addr = address(selector)
+    if !AudioObjectHasProperty(objectID, &addr) {
+        return ""
+    }
+
+    var value: CFString = "" as CFString
+    var size = UInt32(MemoryLayout<CFString>.size)
+    let status = withUnsafeMutablePointer(to: &value) { ptr in
+        AudioObjectGetPropertyData(objectID, &addr, 0, nil, &size, ptr)
+    }
+    if status != noErr {
+        return ""
+    }
+    return value as String
+}
+
+func uint32Property(_ objectID: AudioObjectID,
+                    _ selector: AudioObjectPropertySelector,
+                    _ scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> UInt32 {
+    var addr = address(selector, scope)
+    if !AudioObjectHasProperty(objectID, &addr) {
+        return 0
+    }
+
+    var value: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    let status = AudioObjectGetPropertyData(objectID, &addr, 0, nil, &size, &value)
+    if status != noErr {
+        return 0
+    }
+    return value
+}
+
+func pidProperty(_ objectID: AudioObjectID, _ selector: AudioObjectPropertySelector) -> pid_t {
+    var addr = address(selector)
+    if !AudioObjectHasProperty(objectID, &addr) {
+        return 0
+    }
+
+    var value: pid_t = 0
+    var size = UInt32(MemoryLayout<pid_t>.size)
+    let status = AudioObjectGetPropertyData(objectID, &addr, 0, nil, &size, &value)
+    return status == noErr ? value : 0
+}
+
+func objectIDsProperty(_ objectID: AudioObjectID,
+                       _ selector: AudioObjectPropertySelector,
+                       _ scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> [AudioObjectID] {
+    var addr = address(selector, scope)
+    if !AudioObjectHasProperty(objectID, &addr) {
+        return []
+    }
+
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(objectID, &addr, 0, nil, &size) == noErr,
+          size >= UInt32(MemoryLayout<AudioObjectID>.size) else {
+        return []
+    }
+
+    let count = Int(size) / MemoryLayout<AudioObjectID>.size
+    var values = [AudioObjectID](repeating: 0, count: count)
+    guard AudioObjectGetPropertyData(objectID, &addr, 0, nil, &size, &values) == noErr else {
+        return []
+    }
+    return values
+}
+
+func processPath(_ pid: pid_t) -> String {
+    var buffer = [CChar](repeating: 0, count: 4096)
+    let count = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+    return count > 0 ? String(cString: buffer) : "<unknown>"
+}
+
+func hasStreams(_ objectID: AudioObjectID, _ scope: AudioObjectPropertyScope) -> Bool {
+    var addr = address(kAudioDevicePropertyStreams, scope)
+    if !AudioObjectHasProperty(objectID, &addr) {
+        return false
+    }
+
+    var size: UInt32 = 0
+    let status = AudioObjectGetPropertyDataSize(objectID, &addr, 0, nil, &size)
+    return status == noErr && size > 0
+}
+
+func getDefault(_ selector: AudioObjectPropertySelector) -> AudioDeviceID? {
+    var addr = address(selector)
+    var value = AudioDeviceID(0)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    let status = AudioObjectGetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject),
+        &addr,
+        0,
+        nil,
+        &size,
+        &value
+    )
+    return status == noErr && value != 0 ? value : nil
+}
+
+func setDefault(_ selector: AudioObjectPropertySelector, _ deviceID: AudioDeviceID) {
+    var addr = address(selector)
+    var value = deviceID
+    let size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    let status = AudioObjectSetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject),
+        &addr,
+        0,
+        nil,
+        size,
+        &value
+    )
+    check(status, "failed to set CoreAudio default device")
+}
+
+func devices() -> [Device] {
+    var addr = address(kAudioHardwarePropertyDevices)
+    var size: UInt32 = 0
+    check(AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size),
+          "failed to list CoreAudio devices")
+
+    let count = Int(size) / MemoryLayout<AudioDeviceID>.size
+    var ids = [AudioDeviceID](repeating: 0, count: count)
+    check(AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &ids),
+          "failed to read CoreAudio devices")
+
+    return ids.map { id in
+        Device(
+            id: id,
+            name: stringProperty(id, kAudioDevicePropertyDeviceNameCFString),
+            uid: stringProperty(id, kAudioDevicePropertyDeviceUID),
+            transport: uint32Property(id, kAudioDevicePropertyTransportType),
+            hasOutput: hasStreams(id, kAudioDevicePropertyScopeOutput),
+            hasInput: hasStreams(id, kAudioDevicePropertyScopeInput),
+            isRunning: uint32Property(id, kAudioDevicePropertyDeviceIsRunningSomewhere) != 0
+        )
+    }.filter { !$0.name.isEmpty }
+}
+
+func matches(_ value: String, _ pattern: String) -> Bool {
+    return value.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+}
+
+func transportName(_ value: UInt32) -> String {
+    switch value {
+    case kAudioDeviceTransportTypeBuiltIn:
+        return "built-in"
+    case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE:
+        return "bluetooth"
+    case kAudioDeviceTransportTypeAirPlay:
+        return "airplay"
+    case kAudioDeviceTransportTypeUSB:
+        return "usb"
+    case kAudioDeviceTransportTypeHDMI:
+        return "hdmi"
+    case kAudioDeviceTransportTypeDisplayPort:
+        return "displayport"
+    case kAudioDeviceTransportTypeVirtual:
+        return "virtual"
+    default:
+        return "other"
+    }
+}
+
+let allDevices = devices()
+let deviceByID = Dictionary(uniqueKeysWithValues: allDevices.map { ($0.id, $0) })
+
+func audioProcesses() -> [AudioProcessInfo] {
+    let system = AudioObjectID(kAudioObjectSystemObject)
+    let processIDs = objectIDsProperty(system, kAudioHardwarePropertyProcessObjectList)
+
+    return processIDs.compactMap { objectID in
+        let pid = pidProperty(objectID, kAudioProcessPropertyPID)
+        guard pid > 0 else { return nil }
+        return AudioProcessInfo(
+            pid: pid,
+            bundleID: stringProperty(objectID, kAudioProcessPropertyBundleID),
+            executablePath: processPath(pid),
+            runningInput: uint32Property(objectID, kAudioProcessPropertyIsRunningInput) != 0,
+            runningOutput: uint32Property(objectID, kAudioProcessPropertyIsRunningOutput) != 0,
+            inputDevices: objectIDsProperty(objectID, kAudioProcessPropertyDevices, kAudioObjectPropertyScopeInput),
+            outputDevices: objectIDsProperty(objectID, kAudioProcessPropertyDevices, kAudioObjectPropertyScopeOutput)
+        )
+    }
+}
+
+let activeProcesses = audioProcesses().filter { $0.runningInput || $0.runningOutput }
+let defaultOutput = getDefault(kAudioHardwarePropertyDefaultOutputDevice)
+let defaultSystem = getDefault(kAudioHardwarePropertyDefaultSystemOutputDevice)
+let defaultInput = getDefault(kAudioHardwarePropertyDefaultInputDevice)
+
+func findDevice(_ id: AudioDeviceID?) -> Device? {
+    guard let id = id else { return nil }
+    return allDevices.first { $0.id == id }
+}
+
+func describe(_ label: String, _ device: Device?) {
+    if let device = device {
+        print("\(label): \(device.name) [\(transportName(device.transport))]")
+    } else {
+        print("\(label): <none>")
+    }
+}
+
+func isProblem(_ device: Device?) -> Bool {
+    guard let device = device else { return false }
+    return matches(device.name, problemPattern)
+}
+
+func deviceNames(_ ids: [AudioObjectID]) -> String {
+    let names = ids.compactMap { deviceByID[$0]?.name }
+    return names.isEmpty ? "<unknown>" : names.joined(separator: ", ")
+}
+
+func describeActivity() {
+    if activeProcesses.isEmpty {
+        print("Active CoreAudio processes: none")
+        return
+    }
+
+    print("Active CoreAudio processes: \(activeProcesses.count)")
+    for process in activeProcesses.sorted(by: { $0.pid < $1.pid }) {
+        let directions = [
+            process.runningOutput ? "output" : nil,
+            process.runningInput ? "input" : nil
+        ].compactMap { $0 }.joined(separator: ",")
+        let bundle = process.bundleID.isEmpty ? "<unknown>" : process.bundleID
+        print("Audio process PID: \(process.pid)")
+        print("  bundle: \(bundle)")
+        print("  process: \(process.executablePath)")
+        print("  direction: \(directions)")
+        if process.runningOutput {
+            print("  output devices: \(deviceNames(process.outputDevices))")
+        }
+        if process.runningInput {
+            print("  input devices: \(deviceNames(process.inputDevices))")
+        }
+    }
+}
+
+func preferredOutput() -> Device? {
+    let outputs = allDevices.filter { $0.hasOutput }
+    return outputs.first { matches($0.name, outputPattern) }
+        ?? outputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn }
+        ?? outputs.first { !matches($0.name, problemPattern) }
+}
+
+func preferredInput() -> Device? {
+    let inputs = allDevices.filter { $0.hasInput }
+    return inputs.first { matches($0.name, inputPattern) }
+        ?? inputs.first { $0.transport == kAudioDeviceTransportTypeBuiltIn }
+        ?? inputs.first { !matches($0.name, problemPattern) }
+}
+
+let out = findDevice(defaultOutput)
+let sys = findDevice(defaultSystem)
+let input = findDevice(defaultInput)
+let problemDetected = isProblem(out) || isProblem(sys) || isProblem(input)
+let problemAudioDetected = allDevices.contains { $0.isRunning && matches($0.name, problemPattern) }
+
+switch command {
+case "route":
+    describe("Default output", out)
+    describe("System output", sys)
+    describe("Default input", input)
+    print("Problem route detected: \(problemDetected ? "yes" : "no")")
+
+case "check":
+    describe("Default output", out)
+    describe("System output", sys)
+    describe("Default input", input)
+    print("Problem route detected: \(problemDetected ? "yes" : "no")")
+    print("AirPods-matched device running: \(problemAudioDetected ? "yes" : "no")")
+    describeActivity()
+    if problemDetected || problemAudioDetected {
+        exit(20)
+    }
+
+case "activity":
+    describeActivity()
+
+case "devices":
+    for device in allDevices.sorted(by: { $0.name < $1.name }) {
+        let flags = [
+            device.hasOutput ? "output" : nil,
+            device.hasInput ? "input" : nil,
+            defaultOutput == device.id ? "default-output" : nil,
+            defaultSystem == device.id ? "system-output" : nil,
+            defaultInput == device.id ? "default-input" : nil,
+            device.isRunning ? "running" : nil
+        ].compactMap { $0 }.joined(separator: ",")
+        print("\(device.name) [\(transportName(device.transport))] \(flags)")
+    }
+
+case "fix":
+    describe("Before output", out)
+    describe("Before system", sys)
+    describe("Before input", input)
+
+    if !problemDetected && !problemAudioDetected && !force {
+        print("No AirPods-matched route or running device found; no CoreAudio route change needed.")
+        exit(0)
+    }
+
+    if isProblem(out) || problemAudioDetected || force {
+        guard let target = preferredOutput() else {
+            die("no non-AirPods output device found")
+        }
+        setDefault(kAudioHardwarePropertyDefaultOutputDevice, target.id)
+        print("Set default output: \(target.name)")
+    }
+
+    if isProblem(sys) || problemAudioDetected || force {
+        guard let target = preferredOutput() else {
+            die("no non-AirPods system-output device found")
+        }
+        setDefault(kAudioHardwarePropertyDefaultSystemOutputDevice, target.id)
+        print("Set system output: \(target.name)")
+    }
+
+    if isProblem(input) || problemAudioDetected || force {
+        guard let target = preferredInput() else {
+            die("no non-AirPods input device found")
+        }
+        setDefault(kAudioHardwarePropertyDefaultInputDevice, target.id)
+        print("Set default input: \(target.name)")
+    }
+
+    let refreshed = devices()
+    func refreshedDevice(_ id: AudioDeviceID?) -> Device? {
+        guard let id = id else { return nil }
+        return refreshed.first { $0.id == id }
+    }
+    describe("After output", refreshedDevice(getDefault(kAudioHardwarePropertyDefaultOutputDevice)))
+    describe("After system", refreshedDevice(getDefault(kAudioHardwarePropertyDefaultSystemOutputDevice)))
+    describe("After input", refreshedDevice(getDefault(kAudioHardwarePropertyDefaultInputDevice)))
+
+default:
+    die("unknown CoreAudio command: \(command)", 2)
+}
+SWIFT
+
+  /usr/bin/swift "$swift_file" "$@"
+  local core_status=$?
+  rm -rf "$swift_dir"
+  trap - EXIT
+  return $core_status
+}
+
+audio_assertion_rows() {
+  /usr/bin/pmset -g assertions | /usr/bin/awk '
+    /^[[:space:]]*pid [0-9]+\(/ {
+      owner=$0
+      created=""
+      assertion=owner
+      resources=""
+      next
+    }
+    /Created for PID:/ {
+      created=$NF
+      gsub(/\./, "", created)
+      next
+    }
+    /Resources:.*audio-/ {
+      resources=$0
+      sub(/^[[:space:]]+/, "", resources)
+      if (created == "") created="?"
+      print created "\t" resources "\t" assertion
+    }
+  '
+}
+
+audio_assertion_count() {
+  audio_assertion_rows | /usr/bin/awk 'NF { count++ } END { print count + 0 }'
+}
+
+sim_audio_count() {
+  sim_audio_pids | /usr/bin/awk 'NF { count++ } END { print count + 0 }'
+}
+
+media_session_rows() {
+  /bin/ps axww -o pid=,args= | /usr/bin/awk '
+    /\/usr\/bin\/awk/ { next }
+    /AirBuddy.*NowPlayingService/ {
+      print $1 "\tINFO\tAirBuddy NowPlayingService\t" substr($0, index($0, $2))
+      next
+    }
+    /CoreSimulator.*(MediaRemote|NanoMediaRemote|AdaptiveMusic)/ {
+      print $1 "\tINFO\tCoreSimulator MediaRemote\t" substr($0, index($0, $2))
+      next
+    }
+    /audio\.mojom\.AudioService/ {
+      print $1 "\tWARN\tChromium\\/Electron audio service\t" substr($0, index($0, $2))
+      next
+    }
+    /\/Applications\/Spotify.app\/Contents\/MacOS\/Spotify$/ {
+      print $1 "\tWARN\tSpotify app process\t" substr($0, index($0, $2))
+      next
+    }
+  '
+}
+
+print_problem_banner() {
+  local title=$1
+  local detail=$2
+
+  print "${red}${bold}===============================================================================${reset}"
+  print "${red}${bold}!!! $title !!!${reset}"
+  print "${red}${bold}$detail${reset}"
+  print "${yellow}${bold}Run: $name fix${reset}"
+  print "${red}${bold}===============================================================================${reset}"
+}
+
+print_ok_banner() {
+  print "${green}${bold}OK: no AirPods-matched route, running AirPods device, or simulator audio claim detected.${reset}"
+}
+
+ask_to_fix() {
+  local detected_status=$1
+  local answer
+
+  (( detected_status != 0 )) || return 0
+
+  print
+  if [[ ! -t 0 ]]; then
+    print "${yellow}${bold}Problem detected, but stdin is not interactive; no fix will be run.${reset}"
+    return "$detected_status"
+  fi
+
+  printf "%s" "${yellow}${bold}Problem detected. Run audio-only fix now? [y/N] ${reset}"
+  if read -r -t "$prompt_timeout" answer; then
+    case "${answer:l}" in
+      y|yes)
+        print
+        fix
+        return $?
+        ;;
+      *)
+        print "No fix run."
+        return "$detected_status"
+        ;;
+    esac
+  fi
+
+  print
+  print "No response after ${prompt_timeout}s; no fix run."
+  return "$detected_status"
+}
+
+print_assertions() {
+  local found=0
+  local pid resources assertion comm args
+
+  while IFS=$'\t' read -r pid resources assertion; do
+    [[ -n "${pid:-}" ]] || continue
+    found=1
+    if [[ "$pid" == "?" ]]; then
+      comm="<unknown>"
+      args=""
+    else
+      comm=$(/bin/ps -p "$pid" -o comm= 2>/dev/null | /usr/bin/sed 's/^[[:space:]]*//') || comm="<exited>"
+      args=$(/bin/ps -p "$pid" -o args= 2>/dev/null | /usr/bin/sed 's/^[[:space:]]*//') || args=""
+      [[ -n "$comm" ]] || comm="<exited>"
+    fi
+
+    if [[ "$assertion" == *iOSSimulatorAudioDevice* || "$assertion" == *SimulatorAudioDevice* || "$args" == *CoreSimulator* || "$args" == *simruntime* || "$args" == *SimAudioProcessor* ]]; then
+      print "${red}${bold}SUSPECT: CoreSimulator audio is active${reset}"
+    else
+      print "${yellow}${bold}AUDIO ACTIVE${reset}"
+    fi
+    print "${bold}Audio assertion PID: $pid${reset}"
+    print "  process: ${bold}$comm${reset}"
+    [[ -n "$args" ]] && print "  command: $args"
+    print "  $resources"
+    print "  $assertion"
+  done < <(audio_assertion_rows)
+
+  if [[ "$found" == 0 ]]; then
+    print "No active audio-in/audio-out power assertions found."
+  fi
+}
+
+print_media_sessions() {
+  local found=0
+  local info_found=0
+  local warn_hidden=0
+  local pid severity label args
+
+  while IFS=$'\t' read -r pid severity label args; do
+    [[ -n "${pid:-}" ]] || continue
+    found=1
+    if [[ "$severity" == "WARN" && "${AIRPODS_SHOW_WARNINGS:-}" != "1" ]]; then
+      (( ++warn_hidden ))
+      continue
+    fi
+
+    local short_args=$args
+    if (( ${#short_args} > 220 )); then
+      short_args="${short_args[1,220]}..."
+    fi
+
+    if [[ "$severity" == "INFO" ]]; then
+      (( ++info_found ))
+      print "${bold}BACKGROUND HELPER: $label${reset}"
+    else
+      print "${yellow}${bold}MEDIA-CAPABLE: $label${reset}"
+    fi
+    print "${bold}Media session PID: $pid${reset}"
+    print "  command: $short_args"
+  done < <(media_session_rows)
+
+  if [[ "$found" == 0 ]]; then
+    print "No media-session helper suspects found."
+  fi
+  if (( info_found > 0 )); then
+    print "Background helper presence is expected and is not treated as an AirPods problem."
+  fi
+  if (( warn_hidden > 0 )); then
+    print "${yellow}${bold}Hidden media-capable warning helper(s): $warn_hidden${reset}"
+    print "Set AIRPODS_SHOW_WARNINGS=1 to show browser/Electron audio helper details."
+  fi
+}
+
+sim_audio_pids() {
+  local pid resources assertion args
+
+  while IFS=$'\t' read -r pid resources assertion; do
+    [[ "$pid" == <-> ]] || continue
+    args=$(/bin/ps -p "$pid" -o args= 2>/dev/null || true)
+    if [[ "$assertion" == *iOSSimulatorAudioDevice* || "$assertion" == *SimulatorAudioDevice* || "$args" == *CoreSimulator* || "$args" == *simruntime* || "$args" == *SimAudioProcessor* ]]; then
+      print "$pid"
+    fi
+  done < <(audio_assertion_rows) | /usr/bin/sort -u
+}
+
+array_from_lines() {
+  local output=$1
+  if [[ -z "$output" ]]; then
+    return 0
+  fi
+  print -r -- "$output"
+}
+
+kill_sim_audio() {
+  local pids filtered pid args
+  pids=("${(@f)$(array_from_lines "$(sim_audio_pids)")}")
+  filtered=()
+  for pid in "${pids[@]}"; do
+    [[ "$pid" == <-> ]] && filtered+=("$pid")
+  done
+  pids=("${filtered[@]}")
+
+  if (( ${#pids[@]} == 0 )); then
+    print "No CoreSimulator audio assertion processes found."
+    return 0
+  fi
+
+  for pid in "${pids[@]}"; do
+    args=$(/bin/ps -p "$pid" -o args= 2>/dev/null | /usr/bin/sed 's/^[[:space:]]*//') || args=""
+    if [[ -z "$args" ]]; then
+      print "PID $pid already exited."
+      continue
+    fi
+    print "Stopping CoreSimulator audio assertion PID $pid: $args"
+    /bin/kill -TERM "$pid" 2>/dev/null || true
+  done
+}
+
+reset_media_sessions() {
+  if /usr/bin/pgrep -x mediaremoteagent >/dev/null 2>&1; then
+    print "Restarting Apple mediaremoteagent to clear stale Now Playing state."
+    /usr/bin/killall mediaremoteagent 2>/dev/null || true
+  else
+    print "Apple mediaremoteagent is not running."
+  fi
+  print "AirBuddy and CoreSimulator background helpers were left running; their presence alone is not a fault signal."
+}
+
+check() {
+  set +e
+  local route_output
+  route_output=$(coreaudio check "$problem_re" "$safe_output_re" "$safe_input_re" 2>&1)
+  local route_status=$?
+  set -e
+
+  local audio_count process_count sim_count
+  audio_count=$(audio_assertion_count)
+  process_count=$(print -r -- "$route_output" | /usr/bin/awk '/^Active CoreAudio processes: [0-9]+$/ { print $4; exit }')
+  [[ "$process_count" == <-> ]] || process_count=0
+  sim_count=$(sim_audio_count)
+
+  if [[ "$route_status" != 0 && "$route_status" != 20 ]]; then
+    print "${red}${bold}CoreAudio inspection failed (exit $route_status):${reset}"
+    print "$route_output"
+    return "$route_status"
+  fi
+
+  if [[ "$route_status" == 20 ]]; then
+    if [[ "$route_output" == *"Problem route detected: yes"* ]]; then
+      print_problem_banner "AIRPODS ROUTE DETECTED" "macOS default audio currently matches: $problem_re"
+    else
+      print_problem_banner "AIRPODS AUDIO ACTIVE" "CoreAudio reports that an AirPods-matched device is actively running."
+    fi
+  elif (( sim_count > 0 )); then
+    print_problem_banner "SIMULATOR AUDIO CLAIM DETECTED" "CoreSimulator is currently holding audio output (${sim_count} process(es))."
+  elif (( audio_count > 0 || process_count > 0 )); then
+    print "${yellow}${bold}-------------------------------------------------------------------------------${reset}"
+    print "${yellow}${bold}AUDIO IS ACTIVE: CoreAudio process(es): ${process_count}; power assertion(s): ${audio_count}.${reset}"
+    print "${yellow}${bold}This is not automatically classified as the AirPods bug unless it is Simulator or the route is AirPods.${reset}"
+    print "${yellow}${bold}-------------------------------------------------------------------------------${reset}"
+  else
+    print_ok_banner
+  fi
+
+  print
+  print "${bold}CoreAudio route and activity:${reset}"
+  print "$route_output"
+  print
+  print "${bold}Audio currently running:${reset}"
+  print_assertions
+  print
+  print "${bold}Background media helpers (informational):${reset}"
+  print_media_sessions
+
+  if [[ "$route_status" == 20 || "$sim_count" -gt 0 ]]; then
+    ask_to_fix 20
+    return $?
+  fi
+  return 0
+}
+
+fix() {
+  print "${bold}Running audio-only fix. Bluetooth is not touched.${reset}"
+  print
+
+  set +e
+  local before_route_output
+  before_route_output=$(coreaudio check "$problem_re" "$safe_output_re" "$safe_input_re" 2>&1)
+  local before_route_status=$?
+  set -e
+
+  local before_sim_count action_count=0
+  before_sim_count=$(sim_audio_count)
+
+  if [[ "$before_route_status" != 0 && "$before_route_status" != 20 ]]; then
+    print "${red}${bold}CoreAudio inspection failed (exit $before_route_status):${reset}"
+    print "$before_route_output"
+    return "$before_route_status"
+  fi
+
+  print "Before fix:"
+  print "$before_route_output"
+  print
+
+  if [[ "$before_route_status" == 20 ]]; then
+    print "CoreAudio route/device fix:"
+    coreaudio fix "$problem_re" "$safe_output_re" "$safe_input_re"
+    (( ++action_count ))
+  else
+    print "CoreAudio route fix: no AirPods-matched default route found; no route change needed."
+  fi
+  print
+
+  if (( before_sim_count > 0 )); then
+    print "CoreSimulator audio assertion fix:"
+    kill_sim_audio
+    (( ++action_count ))
+  else
+    print "CoreSimulator audio assertion fix: no simulator audio claim found."
+  fi
+  print
+
+  if (( action_count > 0 )); then
+    print "Waiting ${verify_delay}s before verification..."
+    sleep "$verify_delay"
+  else
+    print "No actionable audio problem was present. Background media helpers are not killed because they relaunch and are not evidence of the fault."
+  fi
+
+  set +e
+  local after_route_output
+  after_route_output=$(coreaudio check "$problem_re" "$safe_output_re" "$safe_input_re" 2>&1)
+  local after_route_status=$?
+  set -e
+
+  local after_sim_count
+  after_sim_count=$(sim_audio_count)
+
+  print
+  print "Verification:"
+  print "$after_route_output"
+  if [[ "$after_route_status" != 0 && "$after_route_status" != 20 ]]; then
+    print "${red}${bold}FIX NOT VERIFIED: CoreAudio verification failed (exit $after_route_status).${reset}"
+    return "$after_route_status"
+  fi
+  if [[ "$after_route_status" == 20 || "$after_sim_count" -gt 0 ]]; then
+    print
+    print "${red}${bold}FIX NOT VERIFIED: an actionable audio problem remains.${reset}"
+    (( after_sim_count > 0 )) && print "CoreSimulator audio claim(s) remaining: $after_sim_count"
+    return 1
+  fi
+
+  if (( action_count > 0 )); then
+    print "${green}${bold}FIX VERIFIED: the AirPods route and simulator audio claims are clear.${reset}"
+  else
+    print "${green}${bold}NO FIX NEEDED: actionable audio signals are already clear.${reset}"
+  fi
+
+  print
+  print "Current audio assertions:"
+  print_assertions
+  print
+  print "Background media helpers (informational):"
+  print_media_sessions
+}
+
+watch() {
+  local watch_interval=${1:-$interval}
+  [[ "$watch_interval" == <-> ]] || {
+    print -u2 "watch interval must be seconds"
+    return 2
+  }
+
+  print "Watching every ${watch_interval}s. Press Ctrl-C to stop."
+  while true; do
+    set +e
+    coreaudio check "$problem_re" "$safe_output_re" "$safe_input_re" >/tmp/airpods-audio-route.$$.log 2>&1
+    local route_status=$?
+    set -e
+
+    local active_sim_count
+    active_sim_count=$(sim_audio_count)
+
+    if [[ "$route_status" != 0 && "$route_status" != 20 ]]; then
+      print -u2 "CoreAudio inspection failed (exit $route_status):"
+      /bin/cat /tmp/airpods-audio-route.$$.log >&2
+      /bin/rm -f /tmp/airpods-audio-route.$$.log
+      return "$route_status"
+    fi
+
+    if [[ "$route_status" == 20 || "$active_sim_count" -gt 0 ]]; then
+      print
+      /bin/date '+%Y-%m-%d %H:%M:%S'
+      if [[ "$route_status" == 20 ]]; then
+        if /usr/bin/grep -q 'Problem route detected: yes' /tmp/airpods-audio-route.$$.log; then
+          print_problem_banner "AIRPODS ROUTE DETECTED" "macOS default audio currently matches: $problem_re"
+        else
+          print_problem_banner "AIRPODS AUDIO ACTIVE" "CoreAudio reports that an AirPods-matched device is actively running."
+        fi
+      else
+        print_problem_banner "SIMULATOR AUDIO CLAIM DETECTED" "CoreSimulator is currently holding audio output (${active_sim_count} process(es))."
+      fi
+      print
+      print "${bold}CoreAudio route:${reset}"
+      /bin/cat /tmp/airpods-audio-route.$$.log
+      print
+      fix
+    fi
+
+    /bin/rm -f /tmp/airpods-audio-route.$$.log
+    sleep "$watch_interval"
+  done
+}
+
+cmd=${1:-check}
+shift || true
+
+case "$cmd" in
+  check)
+    check
+    ;;
+  fix)
+    fix
+    ;;
+  watch)
+    watch "$@"
+    ;;
+  route)
+    coreaudio route "$problem_re" "$safe_output_re" "$safe_input_re"
+    ;;
+  devices)
+    coreaudio devices "$problem_re" "$safe_output_re" "$safe_input_re"
+    ;;
+  assertions)
+    print_assertions
+    ;;
+  activity)
+    coreaudio activity "$problem_re" "$safe_output_re" "$safe_input_re"
+    ;;
+  media-sessions)
+    print_media_sessions
+    ;;
+  kill-sim-audio)
+    kill_sim_audio
+    ;;
+  reset-media)
+    reset_media_sessions
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    print -u2 "unknown command: $cmd"
+    usage >&2
+    exit 2
+    ;;
+esac

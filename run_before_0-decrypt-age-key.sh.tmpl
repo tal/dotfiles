@@ -1,0 +1,11 @@
+#!/bin/sh
+# Ensure the age identity exists before chezmoi decrypts any encrypted_ files.
+#
+# Delegates to the standalone `install-age-key` script so the bootstrap logic
+# lives in one reusable place (~/.config/bin/install-age-key) usable by any
+# service, not just chezmoi. Runs from the chezmoi source copy because the
+# installed copy in ~/.config/bin isn't applied yet on a first `chezmoi apply`.
+
+set -eu
+
+sh "{{ .chezmoi.sourceDir }}/dot_config/bin/executable_install-age-key"

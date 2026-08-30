@@ -15,19 +15,20 @@ alias /exit='exit'
 # cc function with shorthand parameter support
 cc() {
   local args=()
-  local permission_flag='--allow-dangerously-skip-permissions'
+  local model=''
 
-  # Process parameters
+  # Process parameters. Order doesn't matter: shorthand commands (c/r) and a
+  # model name can appear in any position, before or after each other.
   for arg in "$@"; do
     case "$arg" in
-      a)
-        permission_flag='--enable-auto-mode'
-        ;;
       c)
         args+=(--continue)
         ;;
       r)
         args+=(--resume)
+        ;;
+      opus|sonnet|haiku|fable|claude-*)
+        model="$arg"
         ;;
       *)
         args+=("$arg")
@@ -35,5 +36,9 @@ cc() {
     esac
   done
 
-  claude "$permission_flag" "${args[@]}"
+  if [[ -n "$model" ]]; then
+    args+=(--model "$model")
+  fi
+
+  claude --allow-dangerously-skip-permissions --chrome "${args[@]}"
 }
