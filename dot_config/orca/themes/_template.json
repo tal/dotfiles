@@ -1,0 +1,68 @@
+{
+  "_readme": [
+    "CENTRAL OVERRIDE TEMPLATE for the Orca terminal-theme loader.",
+    "",
+    "This directory (~/.config/orca/themes/) is a machine-local OVERRIDE store.",
+    "The PRIMARY home for a repo's theme is IN THE REPO itself, committed at",
+    "  <worktree>/design/terminal-theme.json",
+    "Only put a file HERE when you cannot commit to the repo, or want to retune a",
+    "repo's colors on THIS machine only. A file here WINS over the repo's committed",
+    "file (git-config model: a deliberate local override beats the shared default).",
+    "",
+    "TO USE: copy this file to  <displayName>.json  where <displayName> is the repo's",
+    "Orca displayName exactly as it appears in `orca repo list` (this is the loader's",
+    "lookup key -- NOT the folder name, NOT the project field below). Example:",
+    "  cp _template.json 'weather-range.json'",
+    "Then edit the colors. Files here are *.json only and are never sourced by zsh.",
+    "The '_readme' and '_docs' keys are ignored by the loader (it only reads",
+    "variants / palette / claudeCode); leave them, delete them, your choice.",
+    "",
+    "The loader applies the TERMINAL half automatically at shell startup (OSC colors).",
+    "The claudeCode half is applied separately by `orca-theme install` (OSC cannot set",
+    "Claude Code's dim 'inactive' text token)."
+  ],
+
+  "name": "My Repo Theme",
+  "project": "my-repo",
+  "source": "free-text provenance note -- where these colors came from",
+
+  "variants": {
+    "day": {
+      "background": "#ffffff",
+      "foreground": "#1b1b1b",
+      "cursor": "#2f6fed"
+    },
+    "night": {
+      "background": "#12233a",
+      "foreground": "#e8f0ff",
+      "cursor": "#4d99f1"
+    }
+  },
+
+  "palette": [
+    "#1b3557", "#ff3d7f", "#21c7e0", "#ffd23f",
+    "#4d99f1", "#c04dff", "#7ff6ff", "#ebffff",
+    "#b0c3d8", "#ff7aa6", "#6fe3ff", "#ffe07a",
+    "#8fc2ff", "#d98cff", "#b3fbff", "#ffffff"
+  ],
+
+  "claudeCode": {
+    "slug": "my-repo-night",
+    "base": "dark",
+    "inactive": "#c4c4c4",
+    "statusName": "#4d99f1",
+    "overrides": {}
+  },
+
+  "_docs": {
+    "lookup": "File basename must equal the repo's Orca displayName + .json (e.g. weather-range.json).",
+    "precedence": "central (this dir) BEATS in-repo <worktree>/design/terminal-theme.json BEATS none (reset).",
+    "variants": "Loader picks one by env ORCA_THEME_VARIANT: 'day'|'night' (default 'night'; invalid -> night).",
+    "variantColors": "background/foreground/cursor are each OPTIONAL; a missing one is not emitted (terminal keeps its default for that slot).",
+    "palette": "OPTIONAL 16 positional ANSI slots (0..15), shared across variants; emitted via OSC 4. Omit to keep the terminal's palette.",
+    "claudeCode": "OPTIONAL Claude Code half. slug default '<project>-night' (repo-scope it -- the ~/.claude/themes namespace is flat/global). base enum: dark|light|dark-daltonized|light-daltonized|dark-ansi|light-ansi (default dark). 'inactive' is a shorthand folded into overrides.inactive when overrides omits it. 'overrides' is Claude Code's own token->color map; drop the key if unused.",
+    "statusName": "OPTIONAL. Color of the PROJECT NAME in the Claude Code statusline (~/.claude/statusline-command.sh). A '#rrggbb' string, or a {\"day\":\"#..\",\"night\":\"#..\"} object (variant-selected). Resolved by `orca-theme statusline-color`; if absent, the statusline falls back to the repo's Orca badgeColor, then to its own default #cc44ff. Pick something readable on the terminal background, since that's what it renders on.",
+    "colorForms": "Terminal OSC values should be #rrggbb. Claude Code values also accept #rgb, rgb(r,g,b), ansi256(n), ansi:<name>.",
+    "apply": "Run `orca-theme install <repo>` to generate ~/.claude/themes/<slug>.json and set the in-repo selection. Terminal colors apply on next shell (or `orca-theme preview` now)."
+  }
+}

@@ -1,0 +1,823 @@
+#!/usr/bin/env zsh
+#
+# orca-theme -- repo-first, data-driven Orca terminal + Claude Code theming.
+#
+# The theme for a repo is DATA, not code: a single JSON file at
+#   <repo>/design/terminal-theme.json                 (in-repo, primary; commit it)
+# optionally overridden per-machine at
+#   ~/.config/orca/themes/<orca-displayName>.json  (central override; wins if present)
+#
+# This CLI only reads/writes those JSON files (and the generated Claude Code
+# theme definition under ~/.claude/themes/). It never edits the shell loader
+# (~/.config/orca/orca-theme.zsh) -- that engine is generic and repo-agnostic.
+#
+# Requires: orca, jq on PATH.
+
+set -o pipefail
+
+# --------------------------------------------------------------------------
+# small helpers
+# --------------------------------------------------------------------------
+
+err() { print -u2 -- "orca-theme: $*" }
+
+need_tools() {
+  if ! (( ${+commands[orca]} && ${+commands[jq]} )); then
+    err "need 'orca' and 'jq' on PATH"
+    return 1
+  fi
+  return 0
+}
+
+# OSC escape helpers (mirror the loader in ~/.config/orca/orca-theme.zsh)
+_orca_osc()     { printf '\e]%s;%s\e\\' "$1" "$2" }
+_orca_palette() { local i=0 c; for c in "$@"; do printf '\e]4;%d;%s\e\\' $i "$c"; (( i++ )); done }
+_orca_reset()   { printf '\e]110\e\\'; printf '\e]111\e\\'; printf '\e]112\e\\'; printf '\e]104\e\\' }
+
+VALID_BASES=(dark light dark-daltonized light-daltonized dark-ansi light-ansi)
+is_valid_base() {
+  local b="$1" v
+  for v in "${VALID_BASES[@]}"; do [[ "$b" == "$v" ]] && return 0; done
+  return 1
+}
+
+# --------------------------------------------------------------------------
+# repo resolution
+#
+#   resolve_repo <repo-name-or-empty>
+#   -> sets RESOLVED_NAME (Orca displayName) and RESOLVED_PATH (worktree dir
+#      to treat as "the repo": the CURRENT worktree's real path when resolved
+#      from ORCA_WORKTREE_ID, or the repo's registered path when resolved by
+#      name).
+# --------------------------------------------------------------------------
+
+resolve_repo() {
+  local repo_arg="$1"
+  RESOLVED_NAME="" RESOLVED_PATH=""
+
+  if [[ -n "$repo_arg" ]]; then
+    local json ok
+    json="$(orca repo show --repo "name:${repo_arg}" --json 2>/dev/null)"
+    ok="$(jq -r '.ok // false' <<<"$json" 2>/dev/null)"
+    if [[ "$ok" != "true" ]]; then
+      err "could not find repo '${repo_arg}' (tried name:${repo_arg}). Run 'orca repo list' for valid names."
+      return 1
+    fi
+    RESOLVED_NAME="$(jq -r '.result.repo.displayName' <<<"$json")"
+    RESOLVED_PATH="$(jq -r '.result.repo.path' <<<"$json")"
+  else
+    if [[ -z "${ORCA_WORKTREE_ID:-}" ]]; then
+      err "no <repo> given and not inside an Orca worktree shell (ORCA_WORKTREE_ID unset); pass a repo name"
+      return 1
+    fi
+    local repo_id="${ORCA_WORKTREE_ID%%::*}"
+    local wt_path="${ORCA_WORKTREE_ID#*::}"
+    local json ok
+    json="$(orca repo show --repo "id:${repo_id}" --json 2>/dev/null)"
+    ok="$(jq -r '.ok // false' <<<"$json" 2>/dev/null)"
+    if [[ "$ok" != "true" ]]; then
+      err "could not resolve the current repo via orca (id:${repo_id})"
+      return 1
+    fi
+    RESOLVED_NAME="$(jq -r '.result.repo.displayName' <<<"$json")"
+    RESOLVED_PATH="$wt_path"
+  fi
+
+  if [[ -z "$RESOLVED_NAME" || -z "$RESOLVED_PATH" ]]; then
+    err "failed to resolve repo"
+    return 1
+  fi
+  return 0
+}
+
+# find_theme_file <displayName> <worktree-path>
+# -> sets THEME_FILE (path or empty) and THEME_SOURCE (central|in-repo|none)
+# Precedence: central override beats in-repo (mirrors the loader exactly).
+find_theme_file() {
+  local name="$1" wt="$2"
+  local central_dir="${ORCA_THEME_DIR:-$HOME/.config/orca/themes}"
+  local central="${central_dir}/${name}.json"
+  local inrepo="${wt}/design/terminal-theme.json"
+  THEME_FILE="" THEME_SOURCE="none"
+  if [[ -r "$central" ]]; then
+    THEME_FILE="$central"; THEME_SOURCE="central"
+  elif [[ -r "$inrepo" ]]; then
+    THEME_FILE="$inrepo"; THEME_SOURCE="in-repo"
+  fi
+}
+
+# _resolve_ident -- best-effort, at-most-once resolution of the CURRENT Orca
+# worktree's displayName + badgeColor from $ORCA_WORKTREE_ID into the caller's
+# locals IDENT_NAME / IDENT_BADGE (guarded by IDENT_DONE). Relies on zsh dynamic
+# scope: the caller declares those three as `local`, we assign through to them.
+# Silent on any miss -- leaves the locals empty. Kept lazy because
+# `orca repo show` costs ~0.15s and the statusline calls us on every render.
+_resolve_ident() {
+  [[ "${IDENT_DONE:-0}" == 1 ]] && return
+  IDENT_DONE=1
+  [[ -n "${ORCA_WORKTREE_ID:-}" ]] || return
+  (( ${+commands[orca]} )) || return
+  local repo_id="${ORCA_WORKTREE_ID%%::*}" json
+  json="$(orca repo show --repo "id:${repo_id}" --json 2>/dev/null)"
+  [[ "$(jq -r '.ok // false' <<<"$json" 2>/dev/null)" == "true" ]] || return
+  IDENT_NAME="$(jq -r '.result.repo.displayName // empty' <<<"$json" 2>/dev/null)"
+  IDENT_BADGE="$(jq -r '.result.repo.badgeColor // empty' <<<"$json" 2>/dev/null)"
+}
+
+# _find_theme_for_dir <dir-or-empty> -- resolve THEME_FILE / THEME_SOURCE for a
+# directory the way the loader does, but orca-free unless it has to be: the
+# central override is keyed by displayName, so the ~0.15s `orca repo show` is
+# only paid when the central dir actually holds real overrides (the '[^_]' glob
+# skips _template.json / _*.json helper files). An empty <dir> means the current
+# Orca worktree, else $PWD. Shared by the two statusline-driven subcommands
+# (statusline-color, osc), which run on every Claude Code statusline render.
+# Caller must declare IDENT_DONE / IDENT_NAME / IDENT_BADGE as locals.
+_find_theme_for_dir() {
+  local dir="$1"
+  if [[ -z "$dir" ]]; then
+    [[ -n "${ORCA_WORKTREE_ID:-}" ]] && dir="${ORCA_WORKTREE_ID#*::}"
+    [[ -z "$dir" ]] && dir="$PWD"
+  fi
+  local central_dir="${ORCA_THEME_DIR:-$HOME/.config/orca/themes}"
+  local -a central_files
+  central_files=( ${central_dir}/[^_]*.json(N) )
+  (( ${#central_files} )) && _resolve_ident
+  find_theme_file "$IDENT_NAME" "$dir"
+}
+
+# theme_status_name <file> <variant> -- print the claudeCode.statusName color
+# for one theme file, or nothing. Accepts either a plain "#rrggbb" string or a
+# { "day": ..., "night": ... } object (variant-selected, with graceful fallback
+# to the other variant). Anything else prints nothing.
+theme_status_name() {
+  local file="$1" variant="$2" out
+  out="$(jq -r --arg v "$variant" '
+      (.claudeCode.statusName) as $s
+      | if   ($s | type) == "string" then $s
+        elif ($s | type) == "object" then ($s[$v] // $s.night // $s.day // empty)
+        else empty end
+    ' "$file" 2>/dev/null)"
+  [[ -n "$out" && "$out" != "null" ]] && print -r -- "$out"
+}
+
+# apply_theme_file <file> <variant>  -- emit OSC 10/11/12/4 for one theme file.
+apply_theme_file() {
+  local file="$1" variant="$2"
+  local -a lines
+  lines=("${(@f)$(jq -r --arg v "$variant" '
+      .variants[$v].background // "-",
+      .variants[$v].foreground // "-",
+      .variants[$v].cursor     // "-",
+      (.palette[]?)
+    ' "$file" 2>/dev/null)}")
+
+  if (( ${#lines} < 3 )); then
+    err "malformed or unreadable theme file: $file"
+    return 1
+  fi
+
+  local bg="${lines[1]}" fg="${lines[2]}" cur="${lines[3]}"
+  local -a palette=()
+  (( ${#lines} > 3 )) && palette=("${(@)lines[4,-1]}")
+
+  [[ "$fg"  != "-" ]] && _orca_osc 10 "$fg"
+  [[ "$bg"  != "-" ]] && _orca_osc 11 "$bg"
+  [[ "$cur" != "-" ]] && _orca_osc 12 "$cur"
+  (( ${#palette} )) && _orca_palette "${palette[@]}"
+  return 0
+}
+
+# set_theme_selection <settings-file> <slug> -- merge {"theme":"custom:<slug>"}
+# into an existing JSON file via jq, never dropping other keys. Creates the
+# file (and its parent dir) if missing.
+set_theme_selection() {
+  local file="$1" slug="$2"
+  mkdir -p "${file:h}" || { err "failed to create ${file:h}"; return 1; }
+
+  local tmp
+  tmp="$(mktemp "${TMPDIR:-/tmp}/orca-theme.XXXXXX")" || { err "mktemp failed"; return 1; }
+
+  if [[ -s "$file" ]]; then
+    if ! jq --arg t "custom:${slug}" '.theme = $t' "$file" > "$tmp" 2>/dev/null; then
+      rm -f "$tmp"
+      err "failed to parse existing $file as JSON -- leaving it untouched"
+      return 1
+    fi
+  else
+    jq -n --arg t "custom:${slug}" '{theme: $t}' > "$tmp"
+  fi
+  mv "$tmp" "$file"
+}
+
+# --------------------------------------------------------------------------
+# subcommands
+# --------------------------------------------------------------------------
+
+usage() {
+  cat <<'EOF'
+orca-theme -- repo-first Orca terminal + Claude Code theming
+
+Theme a repo by committing ONE file: <repo>/design/terminal-theme.json
+No shell edits required -- the loader (~/.config/orca/orca-theme.zsh) reads it
+automatically at every Orca shell startup.
+
+USAGE:
+  orca-theme list
+  orca-theme preview  [<repo>] [--variant day|night]
+  orca-theme apply    [<repo>]
+  orca-theme reset
+  orca-theme new|scaffold <repo> [--central] [--from-badge] [--force]
+  orca-theme install  [<repo>] [--shared]
+  orca-theme statusline-color [<dir>] [--variant day|night]
+  orca-theme osc [<dir>] [--variant day|night]
+  orca-theme doctor
+  orca-theme help
+
+COMMANDS:
+  list                  Table of every registered repo's theme status.
+
+  preview [<repo>]      Apply a repo's theme to THIS terminal right now, to
+                         see it live. Default <repo> = current Orca worktree.
+                         --variant day|night overrides ORCA_THEME_VARIANT
+                         (default: night). Run 'orca-theme reset' after, or
+                         just open a fresh shell.
+
+  apply [<repo>]        Same as preview, without the "temporary" framing --
+                         handy right after editing a theme file.
+
+  reset                 Reset this terminal's colors to its own defaults
+                         (OSC 110/111/112/104).
+
+  new <repo>            Scaffold <repo>/design/terminal-theme.json -- the
+  scaffold <repo>       in-repo source of truth. Commit it to theme every
+                         worktree of the repo automatically.
+    --central             Write ~/.config/orca/themes/<displayName>.json
+                           instead (repos you can't commit to, or a personal
+                           local override).
+    --from-badge          Seed colors from the repo's Orca badgeColor.
+    --force               Overwrite an existing theme file.
+
+  install [<repo>]      Materialize the Claude Code half of a repo's theme
+                         from its claudeCode section (no-op if that section
+                         is absent -- terminal-only theme):
+                           - generate ~/.claude/themes/<slug>.json
+                           - set "theme":"custom:<slug>" in the repo's
+                             .claude/settings.local.json (merged via jq,
+                             other keys preserved)
+    --shared               Write the selection into the COMMITTED
+                           .claude/settings.json instead of settings.local.json
+                           so teammates inherit it (unverified whether Claude
+                           Code honors it there the same way -- confirm with
+                           /status after relaunch).
+
+  statusline-color [<dir>]
+                         Resolve the project-name color for the Claude Code
+                         statusline and print it as "#rrggbb" (or nothing).
+                         Resolution: claudeCode.statusName (string, or a
+                         {day,night} object) from the repo's theme -> the repo's
+                         Orca badgeColor -> nothing. <dir> is where to look for an
+                         in-repo theme (default: current Orca worktree / $PWD);
+                         the statusline passes its project_dir. --variant picks
+                         which statusName to use for an object form.
+                         Meant to be called by ~/.claude/statusline-command.sh,
+                         which falls back to its own default (#cc44ff) on nothing.
+
+  osc [<dir>]           Print the raw terminal OSC 10/11/12/4 payload for the
+                         resolved theme (no newline), or nothing when there is
+                         no theme. Same <dir> / --variant rules as
+                         statusline-color. This is how a pane running a TUI gets
+                         repainted after Orca recreates its renderer surface:
+                         ~/.claude/statusline-command.sh calls it on every
+                         statusline render and writes the result to /dev/tty
+                         (the shell's own precmd/TRAPWINCH repaint can't fire
+                         while Claude Code owns the foreground).
+
+  doctor               Check orca/jq on PATH, ~/.claude/themes, and the
+                         resolved theme source for the current repo.
+
+  help, -h, --help      Show this message.
+
+PRECEDENCE (highest wins):
+  1. central override   ~/.config/orca/themes/<displayName>.json
+  2. in-repo file        <repo>/design/terminal-theme.json
+  3. none                terminal keeps its own defaults
+
+ENV:
+  ORCA_THEME_DIR         Override the central override directory
+                         (default: ~/.config/orca/themes).
+  ORCA_THEME_VARIANT     day|night, default night. Used by preview/apply/doctor
+                         when --variant is not given.
+EOF
+}
+
+list_cmd() {
+  need_tools || return 1
+
+  local json ok
+  json="$(orca repo list --json 2>/dev/null)"
+  ok="$(jq -r '.ok // false' <<<"$json" 2>/dev/null)"
+  if [[ "$ok" != "true" ]]; then
+    err "'orca repo list' failed -- is Orca running? (try 'orca open')"
+    return 1
+  fi
+
+  local central_dir="${ORCA_THEME_DIR:-$HOME/.config/orca/themes}"
+
+  local -a names paths badges
+  names=("${(@f)$(jq -r '.result.repos[].displayName' <<<"$json")}")
+  paths=("${(@f)$(jq -r '.result.repos[].path' <<<"$json")}")
+  badges=("${(@f)$(jq -r '.result.repos[].badgeColor // "-"' <<<"$json")}")
+
+  printf '%-22s %-8s %-5s %-5s %-5s %-24s %-6s %-4s %-5s %s\n' \
+    "REPO" "THEME" "DAY" "NIGHT" "PAL" "CC-SLUG" "CC-OK" "SN" "SEL" "BADGE"
+
+  local i n
+  n=${#names[@]}
+  for (( i = 1; i <= n; i++ )); do
+    local name="${names[$i]}" repo_path="${paths[$i]}" badge="${badges[$i]}"
+    local file="" source="none"
+    find_theme_file "$name" "$repo_path"
+    file="$THEME_FILE"; source="$THEME_SOURCE"
+
+    local dv="-" nv="-" pal="N" slug="-" ccok="N" sn="-" sel="N"
+    if [[ -n "$file" ]]; then
+      dv="$(jq -r 'if (.variants.day // empty)   != null then "Y" else "N" end' "$file" 2>/dev/null)"
+      [[ -z "$dv" ]] && dv="?"
+      nv="$(jq -r 'if (.variants.night // empty) != null then "Y" else "N" end' "$file" 2>/dev/null)"
+      [[ -z "$nv" ]] && nv="?"
+      pal="$(jq -r 'if ((.palette // []) | length) > 0 then "Y" else "N" end' "$file" 2>/dev/null)"
+      [[ -z "$pal" ]] && pal="?"
+      sn="$(jq -r 'if (.claudeCode.statusName? // null) != null then "Y" else "N" end' "$file" 2>/dev/null)"
+      [[ -z "$sn" ]] && sn="?"
+
+      local has_cc
+      has_cc="$(jq -r 'if (.claudeCode // empty) != null then "yes" else "no" end' "$file" 2>/dev/null)"
+      if [[ "$has_cc" == "yes" ]]; then
+        local project
+        project="$(jq -r '.project // empty' "$file" 2>/dev/null)"
+        [[ -z "$project" ]] && project="$name"
+        slug="$(jq -r --arg proj "$project" '.claudeCode.slug // ($proj + "-night")' "$file" 2>/dev/null)"
+        [[ -z "$slug" || "$slug" == "null" ]] && slug="-"
+        [[ -r "$HOME/.claude/themes/${slug}.json" ]] && ccok="Y"
+        if grep -q "\"custom:${slug}\"" "${repo_path}/.claude/settings.local.json" 2>/dev/null \
+          || grep -q "\"custom:${slug}\"" "${repo_path}/.claude/settings.json" 2>/dev/null; then
+          sel="Y"
+        fi
+      fi
+    fi
+    printf '%-22s %-8s %-5s %-5s %-5s %-24s %-6s %-4s %-5s %s\n' \
+      "$name" "$source" "$dv" "$nv" "$pal" "$slug" "$ccok" "$sn" "$sel" "$badge"
+  done
+}
+
+preview_cmd() {
+  local repo_arg="" variant=""
+  while (( $# )); do
+    case "$1" in
+      --variant) shift; variant="${1:-}" ;;
+      --variant=*) variant="${1#*=}" ;;
+      -h|--help) usage; return 0 ;;
+      -*) err "unknown flag: $1"; return 2 ;;
+      *)
+        if [[ -z "$repo_arg" ]]; then repo_arg="$1"
+        else err "unexpected extra argument: $1"; return 2
+        fi ;;
+    esac
+    shift
+  done
+
+  need_tools || return 1
+  resolve_repo "$repo_arg" || return 1
+  find_theme_file "$RESOLVED_NAME" "$RESOLVED_PATH"
+
+  if [[ -z "$THEME_FILE" ]]; then
+    echo "No theme file for '${RESOLVED_NAME}' (checked central override + in-repo). Nothing to preview."
+    return 0
+  fi
+
+  local v="${variant:-${ORCA_THEME_VARIANT:-night}}"
+  case "$v" in
+    day|night) ;;
+    *) err "invalid --variant '$v' (allowed: day, night)"; return 2 ;;
+  esac
+
+  apply_theme_file "$THEME_FILE" "$v" || return 1
+  echo "Previewing '${RESOLVED_NAME}' [${THEME_SOURCE}, ${v}] -- run 'orca-theme reset' or open a fresh shell to revert."
+}
+
+apply_cmd() {
+  local repo_arg=""
+  while (( $# )); do
+    case "$1" in
+      -h|--help) usage; return 0 ;;
+      -*) err "unknown flag: $1"; return 2 ;;
+      *)
+        if [[ -z "$repo_arg" ]]; then repo_arg="$1"
+        else err "unexpected extra argument: $1"; return 2
+        fi ;;
+    esac
+    shift
+  done
+
+  need_tools || return 1
+  resolve_repo "$repo_arg" || return 1
+  find_theme_file "$RESOLVED_NAME" "$RESOLVED_PATH"
+
+  if [[ -z "$THEME_FILE" ]]; then
+    _orca_reset
+    echo "No theme for '${RESOLVED_NAME}' -- reset this terminal to defaults."
+    return 0
+  fi
+
+  local v="${ORCA_THEME_VARIANT:-night}"
+  case "$v" in day|night) ;; *) v=night ;; esac
+
+  apply_theme_file "$THEME_FILE" "$v" || return 1
+  echo "Applied '${RESOLVED_NAME}' [${THEME_SOURCE}, ${v}] to this terminal."
+}
+
+reset_cmd() {
+  _orca_reset
+  echo "Terminal colors reset to defaults."
+}
+
+new_cmd() {
+  local repo_arg="" central=0 from_badge=0 force=0
+  while (( $# )); do
+    case "$1" in
+      --central) central=1 ;;
+      --from-badge) from_badge=1 ;;
+      --force) force=1 ;;
+      -h|--help) usage; return 0 ;;
+      -*) err "unknown flag: $1"; return 2 ;;
+      *)
+        if [[ -z "$repo_arg" ]]; then repo_arg="$1"
+        else err "unexpected extra argument: $1"; return 2
+        fi ;;
+    esac
+    shift
+  done
+
+  if [[ -z "$repo_arg" ]]; then
+    err "usage: orca-theme new <repo> [--central] [--from-badge] [--force]"
+    return 2
+  fi
+
+  need_tools || return 1
+  resolve_repo "$repo_arg" || return 1
+
+  local target
+  if (( central )); then
+    local dir="${ORCA_THEME_DIR:-$HOME/.config/orca/themes}"
+    mkdir -p "$dir" || { err "failed to create $dir"; return 1; }
+    target="${dir}/${RESOLVED_NAME}.json"
+  else
+    mkdir -p "${RESOLVED_PATH}/design" || { err "failed to create ${RESOLVED_PATH}/design"; return 1; }
+    target="${RESOLVED_PATH}/design/terminal-theme.json"
+  fi
+
+  if [[ -e "$target" && $force -ne 1 ]]; then
+    err "refusing to overwrite existing file: $target (pass --force to overwrite)"
+    return 1
+  fi
+
+  # Generic, neutral starting palette/colors -- meant to be edited.
+  local bg_night="#1b2733" fg_night="#e6edf3" cur_night="#58a6ff"
+  local bg_day="#f6f8fa" fg_day="#1b1f24" cur_day="#0969da"
+
+  if (( from_badge )); then
+    local badge
+    badge="$(orca repo list --json 2>/dev/null \
+      | jq -r --arg n "$RESOLVED_NAME" '.result.repos[] | select(.displayName == $n) | .badgeColor // empty' \
+      | head -1)"
+    if [[ -n "$badge" ]]; then
+      local hex="${badge#\#}"
+      case "$hex" in
+        [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])
+          local r=$(( 16#${hex[1,2]} )) g=$(( 16#${hex[3,4]} )) b=$(( 16#${hex[5,6]} ))
+          local luminance=$(( (r*299 + g*587 + b*114) / 1000 ))
+          local fg="#f5f5f5"
+          (( luminance > 140 )) && fg="#111111"
+          bg_night="$badge"; cur_night="$badge"; fg_night="$fg"
+          bg_day="$badge"; cur_day="$badge"; fg_day="$fg"
+          ;;
+        *)
+          print -u2 -- "orca-theme: badgeColor '$badge' isn't #rrggbb, ignoring --from-badge"
+          ;;
+      esac
+    else
+      print -u2 -- "orca-theme: no badgeColor found for '${RESOLVED_NAME}', using generic defaults"
+    fi
+  fi
+
+  jq -n \
+    --arg name "$RESOLVED_NAME" \
+    --arg project "$RESOLVED_NAME" \
+    --arg bgN "$bg_night" --arg fgN "$fg_night" --arg curN "$cur_night" \
+    --arg bgD "$bg_day"   --arg fgD "$fg_day"   --arg curD "$cur_day" \
+    '{
+      name: $name,
+      project: $project,
+      source: "scaffolded by `orca-theme new` -- edit these colors",
+      variants: {
+        day:   { background: $bgD, foreground: $fgD, cursor: $curD },
+        night: { background: $bgN, foreground: $fgN, cursor: $curN }
+      },
+      palette: [
+        "#000000","#cc0000","#4e9a06","#c4a000",
+        "#3465a4","#75507b","#06989a","#d3d7cf",
+        "#555753","#ef2929","#8ae234","#fce94f",
+        "#729fcf","#ad7fa8","#34e2e2","#eeeeec"
+      ],
+      claudeCode: { base: "dark", inactive: "#c4c4c4" }
+    }' > "$target" || { err "failed to write $target"; return 1; }
+
+  echo "Wrote $target"
+  echo ""
+  echo "Next steps:"
+  echo "  1. Edit the day/night colors and palette to taste."
+  echo "  2. orca-theme preview ${repo_arg}   # see it live in this terminal"
+  echo "  3. orca-theme install ${repo_arg}   # wire up the Claude Code half (optional)"
+  if (( ! central )); then
+    echo ""
+    echo "Commit this file -- every Orca worktree of '${RESOLVED_NAME}' is themed automatically."
+  fi
+}
+
+install_cmd() {
+  local repo_arg="" shared=0
+  while (( $# )); do
+    case "$1" in
+      --shared) shared=1 ;;
+      -h|--help) usage; return 0 ;;
+      -*) err "unknown flag: $1"; return 2 ;;
+      *)
+        if [[ -z "$repo_arg" ]]; then repo_arg="$1"
+        else err "unexpected extra argument: $1"; return 2
+        fi ;;
+    esac
+    shift
+  done
+
+  need_tools || return 1
+  resolve_repo "$repo_arg" || return 1
+  find_theme_file "$RESOLVED_NAME" "$RESOLVED_PATH"
+
+  if [[ -z "$THEME_FILE" ]]; then
+    err "no theme file found for '${RESOLVED_NAME}' (checked central override + in-repo); run 'orca-theme new' first"
+    return 1
+  fi
+
+  local has_cc
+  has_cc="$(jq -r 'if (.claudeCode // empty) != null then "yes" else "no" end' "$THEME_FILE" 2>/dev/null)"
+  if [[ "$has_cc" != "yes" ]]; then
+    echo "'${RESOLVED_NAME}' has no claudeCode section in ${THEME_FILE} -- terminal-only theme, nothing to install."
+    return 0
+  fi
+
+  local project slug base
+  project="$(jq -r '.project // empty' "$THEME_FILE")"
+  [[ -z "$project" ]] && project="$RESOLVED_NAME"
+  slug="$(jq -r --arg proj "$project" '.claudeCode.slug // ($proj + "-night")' "$THEME_FILE")"
+  if [[ -z "$slug" || "$slug" == "null" ]]; then
+    err "could not derive a Claude Code slug from $THEME_FILE"
+    return 1
+  fi
+  base="$(jq -r '.claudeCode.base // "dark"' "$THEME_FILE")"
+  if ! is_valid_base "$base"; then
+    err "invalid claudeCode.base '$base' in $THEME_FILE (allowed: ${VALID_BASES[*]})"
+    return 1
+  fi
+
+  local overrides_json
+  overrides_json="$(jq -c '
+      (.claudeCode.overrides // {}) as $ov
+      | if ($ov.inactive == null) and (.claudeCode.inactive != null)
+        then $ov + {inactive: .claudeCode.inactive}
+        else $ov end
+    ' "$THEME_FILE")"
+
+  local themes_dir="$HOME/.claude/themes"
+  local themes_dir_existed=1
+  [[ -d "$themes_dir" ]] || themes_dir_existed=0
+  mkdir -p "$themes_dir" || { err "failed to create $themes_dir"; return 1; }
+
+  # Shape matches Claude Code's own custom-theme files exactly: {base, overrides}.
+  # No extra keys -- the slug is the FILENAME, and adding e.g. a "name" key
+  # would make a hand-written file look "changed" on every run.
+  local theme_def_file="${themes_dir}/${slug}.json"
+  local new_content
+  new_content="$(jq -n --arg base "$base" --argjson overrides "$overrides_json" \
+    '{base: $base, overrides: $overrides}')"
+
+  local changed=1
+  if [[ -r "$theme_def_file" ]]; then
+    local old_norm new_norm
+    old_norm="$(jq -S '.' "$theme_def_file" 2>/dev/null)"
+    new_norm="$(jq -S '.' <<<"$new_content" 2>/dev/null)"
+    [[ -n "$old_norm" && "$old_norm" == "$new_norm" ]] && changed=0
+  fi
+
+  if (( changed )); then
+    if ! jq '.' <<<"$new_content" > "$theme_def_file"; then
+      err "failed writing $theme_def_file"
+      return 1
+    fi
+    echo "Wrote ${theme_def_file}"
+  else
+    echo "${theme_def_file} already up to date"
+  fi
+
+  local settings_file
+  if (( shared )); then
+    settings_file="${RESOLVED_PATH}/.claude/settings.json"
+  else
+    settings_file="${RESOLVED_PATH}/.claude/settings.local.json"
+  fi
+
+  set_theme_selection "$settings_file" "$slug" || return 1
+
+  echo ""
+  echo "Selection: \"theme\":\"custom:${slug}\" set in ${settings_file}"
+  if (( shared )); then
+    echo "NOTE: --shared writes the COMMITTED settings.json. Whether Claude Code honors a"
+    echo "      project-level 'theme' key the same as settings.local.json is unverified --"
+    echo "      confirm with /status after relaunch."
+  else
+    echo "(personal/gitignored; pass --shared to commit the selection for the whole team)"
+  fi
+  echo ""
+  echo "Relaunch Claude Code in this project for the SELECTION change to take effect"
+  echo "(the 'theme' key does not hot-reload; edits to an already-selected theme DEFINITION do)."
+  if (( themes_dir_existed == 0 )); then
+    echo "NOTE: ${themes_dir} did not exist before this run -- the very first theme file in a"
+    echo "      fresh directory needs one Claude Code restart to be picked up."
+  fi
+}
+
+statusline_color_cmd() {
+  local dir_arg="" variant=""
+  while (( $# )); do
+    case "$1" in
+      --variant) shift; variant="${1:-}" ;;
+      --variant=*) variant="${1#*=}" ;;
+      -h|--help) usage; return 0 ;;
+      -*) err "unknown flag: $1"; return 2 ;;
+      *)
+        if [[ -z "$dir_arg" ]]; then dir_arg="$1"
+        else err "unexpected extra argument: $1"; return 2
+        fi ;;
+    esac
+    shift
+  done
+
+  # jq is required to read theme files; orca is optional (only the central-
+  # override precedence check and the badge fallback need it). If jq is missing
+  # there's nothing to do -- print nothing so the caller keeps its own default.
+  (( ${+commands[jq]} )) || return 0
+
+  local v="${variant:-${ORCA_THEME_VARIANT:-night}}"
+  case "$v" in day|night) ;; *) v=night ;; esac
+
+  # Explicit <dir> (the statusline passes its project_dir), else the current
+  # Orca worktree, else PWD.
+  local IDENT_DONE=0 IDENT_NAME="" IDENT_BADGE=""
+  _find_theme_for_dir "$dir_arg"
+
+  # 1) an explicit claudeCode.statusName wins (fast path -- no orca call needed
+  #    when the in-repo file carries it).
+  if [[ -n "$THEME_FILE" ]]; then
+    local sn
+    sn="$(theme_status_name "$THEME_FILE" "$v")"
+    if [[ -n "$sn" ]]; then
+      print -r -- "$sn"
+      return 0
+    fi
+  fi
+
+  # 2) fall back to the repo's Orca badge color.
+  _resolve_ident
+  if [[ -n "$IDENT_BADGE" ]]; then
+    print -r -- "$IDENT_BADGE"
+    return 0
+  fi
+
+  # 3) nothing resolved -> print nothing; the caller keeps its own default.
+  return 0
+}
+
+# osc [<dir>] [--variant day|night] -- print the raw OSC 10/11/12/4 payload for
+# the resolved theme (no trailing newline), or NOTHING when there is no theme
+# or the file is malformed. This is the TUI-side repaint: the shell loader's
+# precmd/TRAPWINCH re-emit can't fire while Claude Code owns the foreground, so
+# ~/.claude/statusline-command.sh calls this on every statusline render and
+# writes the result straight to /dev/tty. Deliberately silent on every failure
+# -- anything on stdout here lands on the terminal.
+osc_cmd() {
+  local dir_arg="" variant=""
+  while (( $# )); do
+    case "$1" in
+      --variant) shift; variant="${1:-}" ;;
+      --variant=*) variant="${1#*=}" ;;
+      -h|--help) usage; return 0 ;;
+      -*) err "unknown flag: $1"; return 2 ;;
+      *)
+        if [[ -z "$dir_arg" ]]; then dir_arg="$1"
+        else err "unexpected extra argument: $1"; return 2
+        fi ;;
+    esac
+    shift
+  done
+
+  (( ${+commands[jq]} )) || return 0
+
+  local v="${variant:-${ORCA_THEME_VARIANT:-night}}"
+  case "$v" in day|night) ;; *) v=night ;; esac
+
+  local IDENT_DONE=0 IDENT_NAME="" IDENT_BADGE=""
+  _find_theme_for_dir "$dir_arg"
+  [[ -n "$THEME_FILE" ]] || return 0
+
+  # apply_theme_file only starts printing after its own validation passed, so
+  # a malformed file yields no partial escape on stdout -- just its stderr line,
+  # which we drop.
+  apply_theme_file "$THEME_FILE" "$v" 2>/dev/null || return 0
+}
+
+doctor_cmd() {
+  local ok=0
+
+  if (( ${+commands[orca]} )); then
+    echo "[ok]   orca on PATH ($(command -v orca))"
+  else
+    echo "[FAIL] orca not on PATH"; ok=1
+  fi
+
+  if (( ${+commands[jq]} )); then
+    echo "[ok]   jq on PATH ($(command -v jq))"
+  else
+    echo "[FAIL] jq not on PATH"; ok=1
+  fi
+
+  local themes_dir="$HOME/.claude/themes"
+  if [[ -d "$themes_dir" ]]; then
+    if [[ -w "$themes_dir" ]]; then
+      echo "[ok]   $themes_dir exists and is writable"
+    else
+      echo "[FAIL] $themes_dir exists but is not writable"; ok=1
+    fi
+  else
+    echo "[warn] $themes_dir does not exist yet (created by 'install'; the first-ever file"
+    echo "       in a fresh dir needs one Claude Code restart to be picked up)"
+  fi
+
+  if [[ -n "${ORCA_WORKTREE_ID:-}" ]]; then
+    if resolve_repo "" 2>/dev/null; then
+      find_theme_file "$RESOLVED_NAME" "$RESOLVED_PATH"
+      echo "[info] current repo: ${RESOLVED_NAME}"
+      echo "[info] resolved theme source: ${THEME_SOURCE}"
+      [[ -n "$THEME_FILE" ]] && echo "[info] theme file: $THEME_FILE"
+      local scol; scol="$(statusline_color_cmd 2>/dev/null)"
+      if [[ -n "$scol" ]]; then
+        echo "[info] statusline project-name color: ${scol}"
+      else
+        echo "[info] statusline project-name color: (statusline default #cc44ff -- no statusName or badge)"
+      fi
+    else
+      echo "[warn] could not resolve the current repo via orca (is Orca reachable?)"
+    fi
+  else
+    echo "[info] not inside an Orca worktree shell (ORCA_WORKTREE_ID unset)"
+  fi
+
+  return $ok
+}
+
+# --------------------------------------------------------------------------
+# main
+# --------------------------------------------------------------------------
+
+main() {
+  local cmd="${1:-help}"
+  (( $# )) && shift
+
+  case "$cmd" in
+    list)          list_cmd "$@" ;;
+    preview)       preview_cmd "$@" ;;
+    apply)         apply_cmd "$@" ;;
+    reset)         reset_cmd "$@" ;;
+    new|scaffold)  new_cmd "$@" ;;
+    install)       install_cmd "$@" ;;
+    statusline-color) statusline_color_cmd "$@" ;;
+    osc)           osc_cmd "$@" ;;
+    doctor)        doctor_cmd "$@" ;;
+    help|-h|--help) usage ;;
+    *)
+      err "unknown command: $cmd"
+      usage
+      return 2
+      ;;
+  esac
+}
+
+main "$@"

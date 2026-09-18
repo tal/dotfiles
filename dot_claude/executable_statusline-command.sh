@@ -88,8 +88,49 @@ else
 fi
 
 # Define colors using ANSI escape codes
-# Purple for directory (matches starship prompt #cc44ff)
-DIR_COLOR="\033[1;38;2;204;68;255m"
+# Project-name color: ask orca-theme for a per-repo color (claudeCode.statusName
+# in the repo's design/terminal-theme.json, else the repo's Orca badge color),
+# falling back to the starship purple #cc44ff when there's no orca theme.
+DIR_R=204; DIR_G=68; DIR_B=255  # #cc44ff default (matches starship prompt)
+ORCA_THEME_BIN="$HOME/.config/orca/bin/orca-theme"
+# orca_theme <subcommand> [args] -- run the CLI under a short timeout so a
+# slow/hung `orca` (badge lookup) never freezes the statusline; the in-repo
+# paths are orca-free and fast either way.
+orca_theme() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 1 "$ORCA_THEME_BIN" "$@" 2>/dev/null
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout 1 "$ORCA_THEME_BIN" "$@" 2>/dev/null
+  else
+    "$ORCA_THEME_BIN" "$@" 2>/dev/null
+  fi
+}
+if [ -x "$ORCA_THEME_BIN" ]; then
+  theme_color=$(orca_theme statusline-color "$initial_dir")
+  if [[ "$theme_color" =~ ^#[0-9a-fA-F]{6}$ ]]; then
+    hex="${theme_color#\#}"
+    DIR_R=$((16#${hex:0:2})); DIR_G=$((16#${hex:2:2})); DIR_B=$((16#${hex:4:2}))
+  fi
+
+  # Re-assert the pane's terminal colors (OSC 10/11/12/4) while Claude Code
+  # owns the foreground. Orca recreates the renderer surface (on its default
+  # background) when it restores / re-activates a pane, and the shell's own
+  # precmd/TRAPWINCH repaint can't run until the TUI exits -- so every
+  # statusline render pushes the theme again, straight to the controlling tty
+  # (our stdout is the statusline text, not the terminal). Color-only OSC: no
+  # cursor movement, nothing visible, one small write, so Ink doesn't notice.
+  # Gated on ORCA_WORKTREE_ID so non-Orca terminals are never written to.
+  if [ -n "${ORCA_WORKTREE_ID:-}" ]; then
+    theme_osc=$(orca_theme osc)
+    if [ -n "$theme_osc" ]; then
+      { printf '%s' "$theme_osc" > /dev/tty; } 2>/dev/null
+      if [ -n "${ORCA_THEME_DEBUG:-}" ]; then
+        echo "$(date +%H:%M:%S) $$ statusline" >> "$ORCA_THEME_DEBUG"
+      fi
+    fi
+  fi
+fi
+DIR_COLOR="\033[1;38;2;${DIR_R};${DIR_G};${DIR_B}m"
 # Green bold for git branch (matches starship git_branch style)
 BRANCH_COLOR="\033[1;32m"
 # Dynamic color for context based on usage level

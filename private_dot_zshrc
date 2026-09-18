@@ -37,6 +37,7 @@ bindkey -M menuselect '^G' send-break
 bindkey -M menuselect '^[' send-break
 
 export PATH="$PATH:$HOME/.config/bin"
+export PATH="$PATH:$HOME/.config/orca/bin"   # orca-theme CLI (colocated in Orca's config dir)
 
 # Ripgrep configuration
 export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"
@@ -120,6 +121,11 @@ fi
 # zoxide (init, worktrunk-aware `z`/`zi`, tab completion, typeahead) lives in
 # ~/.config/zsh/zzz-zoxide.zsh, sourced by the loop just above. It must load
 # after `compinit`, which that loop already guarantees.
+
+# Orca terminal theme engine (repo-first; see ~/.config/orca/README.md).
+# Lives in ~/.config/orca/, so it is NOT picked up by the ~/.config/zsh/*.zsh
+# glob above -- source it explicitly here.
+[ -r "$HOME/.config/orca/orca-theme.zsh" ] && source "$HOME/.config/orca/orca-theme.zsh"
 
 # Claude
 export PATH="$HOME/.claude/local:$PATH"

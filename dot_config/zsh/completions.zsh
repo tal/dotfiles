@@ -8,14 +8,24 @@ _cc() {
   local -a claude_options shorthand_commands
   local state
 
-  # Shorthand commands (c, r) and bare model names -> --model <name>
+  # Shorthand commands (c, r), bare model names -> --model <name>, and
+  # versioned model shorthand (e.g. opus4.6, sonnet4.5) -> --model claude-<family>-<version>.
+  # Any (opus|sonnet|haiku|fable) followed by digits works (dot optional,
+  # e.g. opus48 == opus4.8); these are just the last two versions per family
+  # offered as completion hints.
   shorthand_commands=(
     'c:Continue the most recent conversation'
     'r:Resume a conversation by session ID'
-    'opus:Use the Opus model (--model opus)'
-    'sonnet:Use the Sonnet model (--model sonnet)'
-    'haiku:Use the Haiku model (--model haiku)'
-    'fable:Use the Fable model (--model fable)'
+    'opus:Use the latest Opus model (--model opus)'
+    'opus5:Use Opus 5 (--model claude-opus-5)'
+    'opus4.6:Use Opus 4.6 (--model claude-opus-4-6)'
+    'sonnet:Use the latest Sonnet model (--model sonnet)'
+    'sonnet5:Use Sonnet 5 (--model claude-sonnet-5)'
+    'sonnet4.5:Use Sonnet 4.5 (--model claude-sonnet-4-5)'
+    'haiku:Use the latest Haiku model (--model haiku)'
+    'haiku4.5:Use Haiku 4.5 (--model claude-haiku-4-5)'
+    'fable:Use the latest Fable model (--model fable)'
+    'fable5.1:Use Fable 5.1 (--model claude-fable-5-1)'
   )
 
   # Claude options and flags
@@ -149,3 +159,88 @@ _claude() {
 }
 
 compdef _claude claude
+
+# Zsh completions for the `cx` function (codex counterpart to cc; see aliases.zsh).
+# `cx` reuses codex's own generated completion. `codex completion zsh` is ~4k
+# lines and shelling out to codex on every startup would tax time-to-prompt, so
+# cache the output and regenerate only when the codex binary is newer than the
+# cache. `compdef cx=codex` then maps the `cx` function onto codex's `_codex`.
+if (( $+commands[codex] )); then
+  _codex_comp_cache="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/codex-completion.zsh"
+  if [[ ! -s $_codex_comp_cache || $commands[codex] -nt $_codex_comp_cache ]]; then
+    mkdir -p ${_codex_comp_cache:h}
+    codex completion zsh >| $_codex_comp_cache 2>/dev/null
+  fi
+  source $_codex_comp_cache
+  compdef cx=codex
+  unset _codex_comp_cache
+fi
+
+# Zsh completions for the orca-theme CLI (~/.config/orca/bin/orca-theme).
+# Per-repo Orca terminal + Claude Code theming helper; see ~/.config/orca/README.md.
+# Completes: subcommands, their flags, --variant values, and live repo names.
+
+_orca_theme_repos() {
+  # Orca repo displayNames (may contain spaces -> _describe quotes them for us).
+  # One `orca repo list` per repo-arg completion; empty & silent if Orca is down.
+  local -a _repos
+  _repos=(${(f)"$(orca repo list --json 2>/dev/null | jq -r '.result.repos[].displayName' 2>/dev/null)"})
+  (( ${#_repos} )) && _describe -t repos 'orca repo' _repos
+}
+
+_orca-theme() {
+  local curcontext="$curcontext" state line
+  local -a commands
+  commands=(
+    'list:Table of every registered repo theme status'
+    'preview:Apply a repo theme to THIS terminal, live (temporary)'
+    'apply:Apply a repo theme to THIS terminal (no temporary framing)'
+    'reset:Reset this terminal to its own default colors'
+    'new:Scaffold design/terminal-theme.json in the repo (source of truth)'
+    'scaffold:Alias of new'
+    'install:Materialize the Claude Code half of a repo theme'
+    'statusline-color:Print the statusline project-name color'
+    'doctor:Check orca/jq, themes dir, resolved theme source'
+    'help:Show help'
+  )
+
+  _arguments -C \
+    {-h,--help}'[Show help]' \
+    '1: :->cmd' \
+    '*:: :->args'
+
+  case $state in
+    cmd)
+      _describe -t commands 'orca-theme command' commands
+      ;;
+    args)
+      case $line[1] in
+        preview|apply)
+          _arguments \
+            '--variant[Which variant to apply]:variant:(day night)' \
+            '1:repo:_orca_theme_repos'
+          ;;
+        new|scaffold)
+          _arguments \
+            '--central[Write the central override instead of the in-repo file]' \
+            '--from-badge[Seed colors from the repo Orca badgeColor]' \
+            '--force[Overwrite an existing theme file]' \
+            '1:repo:_orca_theme_repos'
+          ;;
+        install)
+          _arguments \
+            '--shared[Write the selection into the committed settings.json]' \
+            '1:repo:_orca_theme_repos'
+          ;;
+        statusline-color)
+          _arguments \
+            '--variant[Which statusName variant to use]:variant:(day night)' \
+            '1:dir:_files -/'
+          ;;
+        # list | reset | doctor | help take no further arguments
+      esac
+      ;;
+  esac
+}
+
+compdef _orca-theme orca-theme

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Reload the ideas-sync LaunchAgent whenever its plist changes.
+# The hash line makes chezmoi re-run this script only when the plist changes.
+# plist-hash: {{ include "private_Library/LaunchAgents/com.tal.ideas-sync.plist.tmpl" | sha256sum }}
+set -eu
+PLIST="$HOME/Library/LaunchAgents/com.tal.ideas-sync.plist"
+DOMAIN="gui/$(id -u)"
+LABEL="com.tal.ideas-sync"
+[ -f "$PLIST" ] || exit 0
+launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
+launchctl bootstrap "$DOMAIN" "$PLIST"
+launchctl enable "$DOMAIN/$LABEL"
+echo "ideas-sync LaunchAgent (re)loaded"

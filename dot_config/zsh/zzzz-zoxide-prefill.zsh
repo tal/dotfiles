@@ -48,6 +48,17 @@ typeset -ga ZOXIDE_PREFILL_BUCKETS=(
     -1   1.0
 )
 
+# Touch the throttle stamp (creating its directory if needed). Called on every
+# successful --apply, including the common "nothing new" case: the stamp marks
+# when the daily check last *ran*, not when it last *added* something. Without
+# this, a fully-seeded database makes every run hit "nothing new" and return
+# before the old end-of-function stamp write, so the stamp freezes in place,
+# the 24h throttle never resets, and the scan re-fires on every shell startup.
+function _zoxide_prefill_touch_stamp() {
+    [[ -d ${ZOXIDE_PREFILL_STAMP:h} ]] || mkdir -p ${ZOXIDE_PREFILL_STAMP:h}
+    : >| $ZOXIDE_PREFILL_STAMP
+}
+
 # zoxide-prefill [--apply] [--quiet] [<dir>]
 #
 # Prints what it would add and changes nothing unless --apply is given.
@@ -139,6 +150,7 @@ function zoxide-prefill() {
 
     if (( ! $#rows )); then
         [[ $output == verbose ]] && print -r -- "zoxide-prefill: nothing new under $root (${#known} paths already in the database)"
+        [[ $mode == apply ]] && _zoxide_prefill_touch_stamp
         return 0
     fi
 
@@ -164,8 +176,7 @@ function zoxide-prefill() {
         command zoxide add -s $rank $paths || return 1
     done
 
-    [[ -d ${ZOXIDE_PREFILL_STAMP:h} ]] || mkdir -p ${ZOXIDE_PREFILL_STAMP:h}
-    : >| $ZOXIDE_PREFILL_STAMP
+    _zoxide_prefill_touch_stamp
 
     [[ $output == verbose ]] && print -r -- "  added $#rows $( (( $#rows == 1 )) && print -n entry || print -n entries )"
     return 0

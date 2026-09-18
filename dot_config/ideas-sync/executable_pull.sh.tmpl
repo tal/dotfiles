@@ -1,0 +1,40 @@
+#!/bin/sh
+# ideas-sync: pull ideas that bee1 (or any peer) pushed to origin/main.
+# Managed by chezmoi — source: dot_config/ideas-sync/executable_pull.sh.tmpl
+# Scheduled every 15 min by ~/Library/LaunchAgents/com.tal.ideas-sync.plist
+#
+# Safe by design: fast-forwards ONLY. If local main has unpushed commits
+# (diverged), it does nothing and just logs — never rewrites history, never
+# fights an uncommitted working tree.
+
+export PATH="/opt/homebrew/bin:/usr/bin:/bin"
+REPO="{{ .chezmoi.homeDir }}/Documents"
+LOG="{{ .chezmoi.homeDir }}/.local/state/ideas-sync.log"
+mkdir -p "$(dirname "$LOG")"
+
+log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "$LOG"; }
+
+cd "$REPO" 2>/dev/null || { log "ERROR repo missing: $REPO"; exit 0; }
+
+# Fetch quietly; never let a scheduled job kick off a background gc.
+if ! git -c gc.auto=0 fetch --quiet origin 2>>"$LOG"; then
+  log "fetch failed (network/auth?) — retry next interval"
+  exit 0
+fi
+
+LOCAL=$(git rev-parse HEAD 2>/dev/null) || exit 0
+REMOTE=$(git rev-parse origin/main 2>/dev/null) || { log "no origin/main ref"; exit 0; }
+BASE=$(git merge-base HEAD origin/main 2>/dev/null) || exit 0
+
+if [ "$LOCAL" = "$REMOTE" ]; then
+  exit 0                                   # already current — stay silent
+elif [ "$LOCAL" = "$BASE" ]; then
+  # origin is strictly ahead of us → clean fast-forward
+  if git merge --ff-only --quiet origin/main 2>>"$LOG"; then
+    log "fast-forwarded -> $(git rev-parse --short origin/main)"
+  else
+    log "ff refused (working-tree overlap?) — left untouched"
+  fi
+else
+  log "diverged: local has unpushed commits — skipping (reconcile manually)"
+fi
