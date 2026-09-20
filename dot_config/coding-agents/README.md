@@ -141,3 +141,19 @@ your new field to per-tool flags. `cc`/`cx` themselves don't need to change.
 | `~/.config/coding-agents/custom-params.schema.json` | JSON Schema for editor validation |
 | `~/.config/coding-agents/custom-params.example.yaml` | annotated template to copy into a project |
 | `<project>/.config/coding-agents/custom-params.yaml` | your per-project params |
+
+## Private values (public dotfiles repo)
+
+The global file is deployed by chezmoi from a **template**
+(`dot_config/coding-agents/custom-params.yaml.tmpl` in the dotfiles source), so
+the params stay readable in the public repo while private values do not. A
+private value — currently the Beeper MCP `url` — lives as an age-encrypted blob
+under `.secrets/` at the source root and is rendered in with
+`{{ include ".secrets/<name>.age" | decrypt | trim }}`; a fresh machine only needs
+the age key, which the bootstrap already fetches from 1Password.
+
+- **Rotate a value:** `printf '%s' NEWVALUE | chezmoi encrypt > "$(chezmoi source-path)/.secrets/<name>.age"`,
+  then `chezmoi apply ~/.config/coding-agents/custom-params.yaml`.
+- **Edit the tracked file:** `chezmoi edit ~/.config/coding-agents/custom-params.yaml`
+  (opens the `.tmpl`). Never `chezmoi add -T`, `-a`, or `--force` this file —
+  those inline the real value into the source.

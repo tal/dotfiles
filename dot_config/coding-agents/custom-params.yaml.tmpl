@@ -40,6 +40,7 @@ params:
     mcpServers:
       beeper:
         type: http
-        # Placeholder — the real endpoint is kept out of this public repo.
-        # Set your actual URL in your live ~/.config/coding-agents/custom-params.yaml.
-        url: https://your-beeper-host.example/v0/mcp
+        # Private endpoint: age-encrypted at .secrets/beeper-mcp-url.age in the
+        # chezmoi source root and rendered in by the template. Rotate it with:
+        #   printf '%s' NEWURL | chezmoi encrypt > "$(chezmoi source-path)/.secrets/beeper-mcp-url.age"
+        url: {{ include ".secrets/beeper-mcp-url.age" | decrypt | trim }}
