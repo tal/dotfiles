@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tal.local/coding-agents/custom-params.schema.json",
+  "title": "cc/cx custom params",
+  "description": "Named intent bundles for the cc (claude) and cx (codex) shell wrappers. See README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "_help": { "type": "string", "description": "Free-text note; ignored by the tooling." },
+    "params": {
+      "type": "object",
+      "description": "Map of param name -> intent bundle.",
+      "additionalProperties": { "$ref": "#/$defs/param" }
+    }
+  },
+  "$defs": {
+    "param": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One named bundle. Combine any of the fields below; an empty object is a valid no-op placeholder.",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Shown next to the name in tab-completion."
+        },
+        "aliases": {
+          "type": "array",
+          "description": "Extra names that resolve to this param (e.g. a short form: opus48 aliased as \"o\"). They inherit the param's `harnesses` scoping and show in completion marked as aliases.",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "harnesses": {
+          "type": "array",
+          "description": "Which tools this param applies to. Omit = applies to all. cc => \"claude\", cx => \"codex\". On a tool it doesn't apply to, the name is not recognized (it passes through).",
+          "items": { "enum": ["claude", "codex"] },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "model": {
+          "type": "string",
+          "description": "Model to use. cc => --model <v>; cx => -m <v>. Note claude model aliases are not valid codex models."
+        },
+        "effort": {
+          "type": "string",
+          "description": "Reasoning effort. cx => -c model_reasoning_effort=<v>; cc has no effort flag (no-op).",
+          "enum": ["minimal", "low", "medium", "high"]
+        },
+        "permission-mode": {
+          "type": "string",
+          "description": "cc => --permission-mode <v>; ignored by cx.",
+          "enum": ["plan", "acceptEdits", "bypassPermissions", "default", "dontAsk", "auto", "delegate"]
+        },
+        "mcpServers": {
+          "type": "object",
+          "description": "MCP servers to make available, keyed by server name (the MCP convention). cc => merged into --mcp-config; cx => -c mcp_servers.<name>.* overrides. A remote server uses type+url (claude) — codex infers transport from url and ignores type.",
+          "additionalProperties": { "$ref": "#/$defs/mcpServer" }
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables exported for the run (both tools).",
+          "additionalProperties": { "type": "string" }
+        },
+        "args": {
+          "type": "object",
+          "description": "Escape hatch: literal flags appended for each tool.",
+          "additionalProperties": false,
+          "properties": {
+            "cc": { "type": "array", "items": { "type": "string" } },
+            "cx": { "type": "array", "items": { "type": "string" } },
+            "both": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "mcpServer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Standard MCP server definition: command+args(+env) for stdio, or type+url for remote.",
+      "properties": {
+        "command": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "type": { "type": "string", "enum": ["stdio", "http", "sse"] },
+        "url": { "type": "string" }
+      }
+    }
+  }
+}

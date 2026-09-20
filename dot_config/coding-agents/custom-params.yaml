@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=./custom-params.schema.json
+#
+# GLOBAL default params for cc/cx. Merged UNDER any project's
+# .config/coding-agents/custom-params.yaml (a project param of the same name
+# wins). See ./README.md. Add your own everywhere-aliases here.
+#
+# `harnesses` scopes a param to specific tools: cc => "claude", cx => "codex".
+# Omit it to apply everywhere. On a tool a param doesn't apply to, its name is
+# not recognized and just passes through.
+
+params:
+  # Model aliases (claude-oriented). No `harnesses` => apply to all tools.
+  opus:   { description: Latest Opus model,   model: opus }
+  sonnet: { description: Latest Sonnet model, model: sonnet }
+  haiku:  { description: Latest Haiku model,  model: haiku }
+  fable:  { description: Latest Fable model,  model: fable }
+  
+  opus48:
+    aliases:
+      - "o"
+    description: Last Opus model
+    model: claude-code-opus-4-8
+    harnesses:
+      - claude
+
+  # Reasoning-effort aliases (materialize only for codex / cx; no-op on cc).
+  minimal:
+    description: Minimal reasoning effort (codex)
+    effort: minimal
+    harnesses: [codex]
+  low:     { description: Low reasoning effort (codex),     effort: low }
+  medium:  { description: Medium reasoning effort (codex),  effort: medium }
+  high:    { description: High reasoning effort (codex),    effort: high }
+
+  # Beeper MCP (remote, streamable HTTP). Applies to both cc and cx:
+  #   cc -> --mcp-config '{"mcpServers":{"beeper":{"type":"http","url":...}}}'
+  #   cx -> -c mcp_servers.beeper.url="..."  (codex infers http from the url)
+  beeper-mcp:
+    description: Beeper MCP (remote, HTTP)
+    mcpServers:
+      beeper:
+        type: http
+        # Placeholder — the real endpoint is kept out of this public repo.
+        # Set your actual URL in your live ~/.config/coding-agents/custom-params.yaml.
+        url: https://your-beeper-host.example/v0/mcp

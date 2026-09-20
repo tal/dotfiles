@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=./custom-params.schema.json
+#
+# Copy to <project>/.config/coding-agents/custom-params.yaml. Only `params` is
+# read; this file just shows every field. See ./README.md.
+
+params:
+  beeper-mcp:
+    description: Make the Beeper MCP server available (stdio)
+    mcpServers:
+      beeper:
+        command: npx
+        args: [-y, "@beeper/desktop-api-mcp@latest"]
+        env:
+          BEEPER_ACCESS_TOKEN: REPLACE_ME
+
+  linear-mcp:
+    description: Linear MCP (remote, HTTP transport)
+    mcpServers:
+      linear:
+        type: http
+        url: https://mcp.linear.app/mcp
+
+  think:
+    description: Crank reasoning effort (codex only; claude no-ops)
+    effort: high
+    harnesses: [codex]
+
+  big:
+    description: Use the heavy model (claude)
+    model: opus
+    aliases: [b]           # `cc b` == `cc big`
+    harnesses: [claude]
+
+  planmode:
+    description: Start claude in plan mode (claude only)
+    permission-mode: plan
+    harnesses: [claude]
+
+  staging:
+    description: Point the run at the staging backend
+    env:
+      API_ENV: staging
+      LOG_LEVEL: debug
+
+  raw:
+    description: "Escape hatch: inject literal flags per tool"
+    args:
+      cc: [--mcp-debug]
+      cx: [-c, hide_agent_reasoning=true]
+      both: []

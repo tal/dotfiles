@@ -8,7 +8,7 @@ This is a macOS development environment configuration directory managed with [ch
 
 ## Chezmoi-Tracked Files
 
-The following paths under `~/.config/` are tracked by chezmoi: `bin/`, `Brewfile`, `CLAUDE.md`, `cmux/`, `ghostty/`, `karabiner/`, `leader-key/`, `lsd/`, `ripgrep/`, `starship.toml`, `tuna/`, `zed/`, `zsh/`.
+The following paths under `~/.config/` are tracked by chezmoi: `bin/`, `Brewfile`, `CLAUDE.md`, `cmux/`, `coding-agents/`, `ghostty/`, `karabiner/`, `leader-key/`, `lsd/`, `ripgrep/`, `starship.toml`, `tuna/`, `zed/`, `zsh/`.
 
 `~/.config/orca/` is **Orca's own config dir** (it also holds `agent-hooks/`, `keybindings.json`, and a live `worktrees/` tree) — do **not** wholesale-track it. Only these Orca terminal-theme engine files are individually tracked: `orca/orca-theme.zsh`, `orca/bin/orca-theme`, `orca/themes/_template.json`, `orca/README.md`. The loader is sourced from `~/.zshrc` and the CLI is on PATH via `~/.config/orca/bin`. See `orca/README.md`.
 
