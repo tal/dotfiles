@@ -4,6 +4,32 @@ setopt AUTO_CD
 
 # Zsh completions for cc (claude) function
 
+# Offer the nearest project's custom params (from custom-params.json) as
+# completion candidates. Shared by _cc and _cx. Silent when there's no config
+# file, no jq, or no params. Helpers live in ~/.config/zsh/coding-agents.zsh.
+_ca_param_completions() {
+  (( $+functions[_ca_merged] )) || return
+  local merged
+  merged="$(_ca_merged 2>/dev/null)" || return
+  [[ -n "$merged" ]] || return
+  # Offer only params applicable to this tool's harness (cx => codex, else claude).
+  local harness=claude
+  [[ "$words[1]" == cx ]] && harness=codex
+  local -a params
+  params=("${(@f)$(_ca_param_names "$merged" "$harness")}")
+  (( ${#params} )) || return
+  # Offer each param only once: drop any already present on the command line.
+  # words[1] is the command (cc/cx); words[2,-1] are the args typed so far.
+  local -a already=("${(@)words[2,-1]}")
+  local -a fresh
+  local entry
+  for entry in "${params[@]}"; do
+    (( ${already[(Ie)${entry%%:*}]} )) && continue
+    fresh+=("$entry")
+  done
+  (( ${#fresh} )) && _describe -t custom-params 'project custom params' fresh
+}
+
 _cc() {
   local -a claude_options shorthand_commands
   local state
@@ -13,18 +39,17 @@ _cc() {
   # Any (opus|sonnet|haiku|fable) followed by digits works (dot optional,
   # e.g. opus48 == opus4.8); these are just the last two versions per family
   # offered as completion hints.
+  # Bare model names (opus/sonnet/haiku/fable) and effort aliases now live in the
+  # merged custom-params config and are offered via _ca_param_completions; only
+  # the native control shorthands and the generative versioned hints stay here.
   shorthand_commands=(
     'c:Continue the most recent conversation'
     'r:Resume a conversation by session ID'
-    'opus:Use the latest Opus model (--model opus)'
     'opus5:Use Opus 5 (--model claude-opus-5)'
     'opus4.6:Use Opus 4.6 (--model claude-opus-4-6)'
-    'sonnet:Use the latest Sonnet model (--model sonnet)'
     'sonnet5:Use Sonnet 5 (--model claude-sonnet-5)'
     'sonnet4.5:Use Sonnet 4.5 (--model claude-sonnet-4-5)'
-    'haiku:Use the latest Haiku model (--model haiku)'
     'haiku4.5:Use Haiku 4.5 (--model claude-haiku-4-5)'
-    'fable:Use the latest Fable model (--model fable)'
     'fable5.1:Use Fable 5.1 (--model claude-fable-5-1)'
   )
 
@@ -83,6 +108,7 @@ _cc() {
 
   if [[ $state == args ]]; then
     _describe -t shorthand-commands 'shorthand commands' shorthand_commands
+    _ca_param_completions
   fi
 }
 
@@ -160,7 +186,7 @@ _claude() {
 
 compdef _claude claude
 
-# Zsh completions for the `cx` function (codex counterpart to cc; see aliases.zsh).
+# Zsh completions for the `cx` function (codex counterpart to cc; see coding-agents.zsh).
 # `cx` reuses codex's own generated completion. `codex completion zsh` is ~4k
 # lines and shelling out to codex on every startup would tax time-to-prompt, so
 # cache the output and regenerate only when the codex binary is newer than the
@@ -172,7 +198,13 @@ if (( $+commands[codex] )); then
     codex completion zsh >| $_codex_comp_cache 2>/dev/null
   fi
   source $_codex_comp_cache
-  compdef cx=codex
+  # Wrap codex's own completion so `cx` also offers this project's custom params
+  # (see _ca_param_completions above) alongside codex's flags/subcommands.
+  _cx() {
+    _ca_param_completions
+    (( $+functions[_codex] )) && _codex "$@"
+  }
+  compdef _cx cx
   unset _codex_comp_cache
 fi
 

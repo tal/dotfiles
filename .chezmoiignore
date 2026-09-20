@@ -6,7 +6,9 @@
 # Runtime log written by cmux's notification-sound script — not config, don't track
 .config/cmux/notification-sound.log
 
-# This repo's own CLAUDE.md doc lives at the source root; the leading slash
-# anchors to $HOME so it is NOT deployed to ~/CLAUDE.md (but stays as repo docs).
-# Anchored so it does NOT also match .config/CLAUDE.md, which IS managed.
-/CLAUDE.md
+# This repo's own CLAUDE.md doc lives at the source root; ignore it so it is NOT
+# deployed to ~/CLAUDE.md (it stays as repo docs). A bare "CLAUDE.md" (no leading
+# slash) is anchored to the root in chezmoi: it matches ONLY this top-level file,
+# not .config/CLAUDE.md or other nested CLAUDE.md files, which stay managed.
+# (A leading-slash "/CLAUDE.md" is rejected by chezmoi >= 2.72 as an invalid path.)
+CLAUDE.md
